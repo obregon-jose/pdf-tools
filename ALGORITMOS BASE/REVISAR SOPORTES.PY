@@ -3,11 +3,17 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 def extraer_identificador(nombre_archivo):
+    """
+    Extrae el identificador que aparece después del último guion bajo ("_")
+    y antes de la extensión del archivo.
+    Ejemplo: CRC_123_ABC_99999.pdf -> 99999
+    """
     try:
-        partes = nombre_archivo.split("_")
-        if len(partes) < 4:
+        nombre_sin_ext = os.path.splitext(nombre_archivo)[0]
+        partes = nombre_sin_ext.split("_")
+        if len(partes) < 2:
             return None
-        return partes[-1]  # Última parte: [TIPO-DOCUMENTO][#DOCUMENTO]
+        return partes[-1].strip()  # Lo que está después del último "_"
     except:
         return None
 
@@ -29,12 +35,15 @@ def comparar_archivos():
         messagebox.showerror("Error", "Debes seleccionar ambas carpetas.")
         return
 
+    # Obtener archivos que comiencen con CRC_ y OPF_
     archivos_crc = [f for f in os.listdir(carpeta_crc) if f.startswith("CRC_")]
-    archivos_opf = [f for f in os.listdir(carpeta_opf) if f.startswith("CRC_")]
+    archivos_opf = [f for f in os.listdir(carpeta_opf) if f.startswith("OPF_")]
 
+    # Extraer los identificadores
     identificadores_crc = set(filter(None, [extraer_identificador(f) for f in archivos_crc]))
     identificadores_opf = set(filter(None, [extraer_identificador(f) for f in archivos_opf]))
 
+    # Comparar los conjuntos
     sin_pareja_crc = identificadores_crc - identificadores_opf
     sin_pareja_opf = identificadores_opf - identificadores_crc
 
@@ -42,11 +51,11 @@ def comparar_archivos():
 
     if sin_pareja_crc:
         resultado += f"🔴 CRC sin pareja OPF ({len(sin_pareja_crc)}):\n"
-        resultado += "\n".join(sin_pareja_crc) + "\n\n"
+        resultado += "\n".join(sorted(sin_pareja_crc)) + "\n\n"
 
     if sin_pareja_opf:
         resultado += f"🔴 OPF sin pareja CRC ({len(sin_pareja_opf)}):\n"
-        resultado += "\n".join(sin_pareja_opf) + "\n\n"
+        resultado += "\n".join(sorted(sin_pareja_opf)) + "\n\n"
 
     if not resultado:
         resultado = "✅ Todos los archivos tienen su pareja."

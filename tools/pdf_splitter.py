@@ -104,8 +104,9 @@ class PDFSplitterApp(ctk.CTkFrame):
         # This note should appear when NOT renaming (manual_rename_var == False).
         self.rename_note = ctk.CTkLabel(
             self.preview_frame,
-            text="Nota: Si no renombra, los archivos se crearán como Página 1..N (prefijo + Página_n).",
-            text_color="gray"
+            text="Nota: Si no agregas nombres a cada pagina, los archivos se nombraran como Página 1, Página 2, Pagina 3...N",
+            text_color="gray",
+            font=("Arial", 12, "bold")
         )
         # Show only if manual rename is OFF
         if not self.manual_rename_var.get():
@@ -162,7 +163,7 @@ class PDFSplitterApp(ctk.CTkFrame):
 
         # Build single-column layout for pages: each item is a frame with combined label + entry
         for i in range(self.page_count):
-            base_name = f"Documento de Página_{i+1}"
+            base_name = f"Página_{i+1}"
             self.base_names.append(base_name)
             self.user_edited.append(False)
 
@@ -181,7 +182,7 @@ class PDFSplitterApp(ctk.CTkFrame):
             combined_lbl.grid(row=0, column=0, padx=(2, 6), pady=2, sticky="w")
 
             # body entry: editable part only (placeholder visible if empty)
-            entry = ctk.CTkEntry(page_item, placeholder_text=base_name)
+            entry = ctk.CTkEntry(page_item, placeholder_text=f"# Documento de {base_name}")
             entry.grid(row=0, column=1, padx=(0, 6), pady=2, sticky="we")
 
             # bind events to update combined label live and mark edits
