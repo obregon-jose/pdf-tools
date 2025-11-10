@@ -1,0 +1,16 @@
+{
+    "theme": "light",
+    "last_tool": "Calculadora",
+    
+    "user_data": {
+        "horus": {
+            "last_login": "",
+            "email": "",
+            "password_hash": "",
+            "token": ""
+        }
+    },
+
+    "prefix_orden": "",
+    "prefix_register":""
+}
