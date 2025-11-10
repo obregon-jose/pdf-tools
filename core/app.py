@@ -1,6 +1,6 @@
 import customtkinter as ctk
-import os, sys
-from pathlib import Path
+# import os, sys
+# from pathlib import Path
 
 from core.config import load_config, save_config
 from ui.main_window import MainWindow
@@ -12,9 +12,9 @@ class App(ctk.CTk):
 
         self.config_data = load_config()
         self.title(APP_NAME)
-        # self.iconbitmap(resource_path("assets/icon.ico"))
-        self.geometry("990x540")
-        self.minsize(990, 540)
+        # self.iconbitmap("assets/icon.ico")
+        self.geometry("850x540")
+        self.minsize(850, 540)
 
         ctk.set_appearance_mode(self.config_data.get("theme", DEFAULT_CONFIG["theme"]))
         ctk.set_default_color_theme(DEFAULT_CONFIG["color_theme"])

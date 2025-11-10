@@ -11,10 +11,10 @@ class PDFSplitterApp(ctk.CTkFrame):
         # State
         self.pdf_path = ""
         self.page_count = 0
-        # body entries (user-editable part, prefix is shown separately)
+        # body entries (user-editable part)
         self.rename_entries = []
-        # prefix labels (non-editable, shown before each body entry)
-        self.prefix_labels = []
+        # combined "Página N -> prefijo + contenido" labels (single label per row)
+        self.combined_labels = []
         # Default: activar la opción de agregar nombres por página
         self.manual_rename_var = ctk.BooleanVar(value=True)
         self.last_split = None       # {'original': path, 'created_files': [...]}
@@ -24,6 +24,9 @@ class PDFSplitterApp(ctk.CTkFrame):
         self.base_names = []         # base names per page, e.g. "Página_1"
         self.user_edited = []        # optional flags per entry: True if user edited that entry
 
+        # Track previous prefix so we can update labels consistently
+        self.last_prefix = self.prefix_var.get().strip()
+
         # Top frame (single container) with compact spacing
         top_frame = ctk.CTkFrame(self)
         top_frame.pack(fill="x", padx=6, pady=6)
@@ -32,11 +35,11 @@ class PDFSplitterApp(ctk.CTkFrame):
         lbl_pdf = ctk.CTkLabel(top_frame, text="PDF:", width=40, anchor="w")
         lbl_pdf.grid(row=0, column=0, padx=(6, 4), pady=4, sticky="w")
 
-        self.pdf_entry = ctk.CTkEntry(top_frame, placeholder_text="Escribe la ruta del PDF o usa Seleccionar", width=420)
+        self.pdf_entry = ctk.CTkEntry(top_frame, placeholder_text="Escribe la ruta del PDF o usa Seleccionar", width=500)
         self.pdf_entry.grid(row=0, column=1, padx=(0, 6), pady=4, sticky="we")
 
         btn_select_pdf = ctk.CTkButton(top_frame, text="Seleccionar PDF", width=140, command=self.on_select_pdf)
-        btn_select_pdf.grid(row=0, column=2, padx=(0, 6), pady=4)
+        btn_select_pdf.grid(row=0, column=2, padx=(0, 6), pady=4, )
 
         lbl_out = ctk.CTkLabel(top_frame, text="Salida:", width=60, anchor="w")
         lbl_out.grid(row=1, column=0, padx=(6, 4), pady=4, sticky="w")
@@ -69,9 +72,13 @@ class PDFSplitterApp(ctk.CTkFrame):
         )
         self.manual_cb.grid(row=2, column=2, padx=(0, 6), pady=4, sticky="w")
 
-        # Row 3: action buttons (Dividir, Deshacer, Limpiar nombres)
+        # Row 3: small spacer (keep compact)
+        spacer = ctk.CTkFrame(top_frame, height=2)
+        spacer.grid(row=3, column=0, columnspan=3)
+
+        # Row 4: action buttons (Dividir, Deshacer, Limpiar nombres)
         btn_frame = ctk.CTkFrame(top_frame)
-        btn_frame.grid(row=3, column=0, columnspan=3, sticky="we", padx=6, pady=(6,4))
+        btn_frame.grid(row=4, column=0, columnspan=3, sticky="we", padx=6, pady=(0,4))
         btn_frame.grid_columnconfigure(0, weight=1)
         btn_frame.grid_columnconfigure(1, weight=1)
         btn_frame.grid_columnconfigure(2, weight=1)
@@ -79,13 +86,11 @@ class PDFSplitterApp(ctk.CTkFrame):
         self.split_button = ctk.CTkButton(btn_frame, text="Dividir PDF", command=self.on_split_pdf, fg_color="#1f6feb")
         self.split_button.grid(row=0, column=0, padx=6, pady=4, sticky="we")
 
-        # Make the undo button text visible by explicitly setting text_color.
         self.undo_button = ctk.CTkButton(btn_frame, text="Deshacer", command=self.on_undo,
                                          fg_color="#f0ad4e", text_color="black")
         self.undo_button.grid(row=0, column=1, padx=6, pady=4, sticky="we")
         self.undo_button.configure(state="disabled")
 
-        # New button: limpiar nombres (no debe limpiar el prefijo)
         self.clear_names_button = ctk.CTkButton(btn_frame, text="Limpiar nombres", command=self.on_clear_names)
         self.clear_names_button.grid(row=0, column=2, padx=6, pady=4, sticky="we")
 
@@ -95,14 +100,27 @@ class PDFSplitterApp(ctk.CTkFrame):
         self.preview_frame = ctk.CTkFrame(self)
         self.preview_frame.pack(fill="both", expand=True, padx=6, pady=6)
 
-        # Scrollable frame for pages (we'll use a 2-column grid inside)
-        self.scrollable_pages = ctk.CTkScrollableFrame(self.preview_frame, height=360)
-        self.scrollable_pages.pack(fill="both", expand=True, padx=6, pady=6)
+        # NOTE: move the informative note into the preview panel (per request).
+        # This note should appear when NOT renaming (manual_rename_var == False).
+        self.rename_note = ctk.CTkLabel(
+            self.preview_frame,
+            text="Nota: Si no renombra, los archivos se crearán como Página 1..N (prefijo + Página_n).",
+            text_color="gray"
+        )
+        # Show only if manual rename is OFF
+        if not self.manual_rename_var.get():
+            self.rename_note.grid(row=0, column=0, sticky="w", padx=4, pady=(2,4))
 
-        # ensure two equal columns for grid layout if possible
+        # Scrollable frame for pages (single-column now)
+        self.scrollable_pages = ctk.CTkScrollableFrame(self.preview_frame, height=360)
+        # place scrollable below the note (row 1)
+        self.scrollable_pages.grid(row=1, column=0, sticky="nsew", padx=4, pady=2)
+        self.preview_frame.grid_rowconfigure(1, weight=1)
+        self.preview_frame.grid_columnconfigure(0, weight=1)
+
+        # ensure single column stretch
         try:
             self.scrollable_pages.grid_columnconfigure(0, weight=1)
-            self.scrollable_pages.grid_columnconfigure(1, weight=1)
         except Exception:
             pass
 
@@ -132,120 +150,139 @@ class PDFSplitterApp(ctk.CTkFrame):
         # Clear previous preview widgets and state
         for child in self.scrollable_pages.winfo_children():
             child.destroy()
-        self.pages_list_labels = []
+        self.combined_labels = []
         self.rename_entries = []
-        self.prefix_labels = []
         self.base_names = []
         self.user_edited = []
         # reset last_prefix to current prefix so future replacements are consistent
         self.last_prefix = self.prefix_var.get().strip()
 
         prefix = self.prefix_var.get().strip()
+        prefix_text = f"{prefix}_" if prefix else ""
 
-        # Build two-column layout for pages: each item is a frame with label + prefix (readonly) + body entry
+        # Build single-column layout for pages: each item is a frame with combined label + entry
         for i in range(self.page_count):
-            base_name = f"Página_{i+1}"
+            base_name = f"Documento de Página_{i+1}"
             self.base_names.append(base_name)
             self.user_edited.append(False)
 
-            row = i // 2
-            col = i % 2
+            row = i
+            col = 0
 
-            # container for each page item
+            # container for each page item with minimal spacing (reduced padding)
             page_item = ctk.CTkFrame(self.scrollable_pages)
-            page_item.grid(row=row, column=col, padx=6, pady=6, sticky="we")
-            page_item.grid_columnconfigure(2, weight=1)
+            page_item.grid(row=row, column=col, padx=2, pady=2, sticky="we")
+            # columns: 0=combined label, 1=entry
+            page_item.grid_columnconfigure(1, weight=1)
 
-            # small label: "Página N"
-            page_label = ctk.CTkLabel(page_item, text=f"Página {i+1} →", width=80, anchor="w")
-            page_label.grid(row=0, column=0, padx=(4, 8), pady=4, sticky="w")
+            # combined label: "Página N    PREFIJO_"
+            combined_text = f"Página {i+1} → {prefix_text}"
+            combined_lbl = ctk.CTkLabel(page_item, text=combined_text, anchor="w")
+            combined_lbl.grid(row=0, column=0, padx=(2, 6), pady=2, sticky="w")
 
-            # prefix label (readonly) placed before the editable body entry
-            prefix_text = f"{prefix}_" if prefix else ""
-            prefix_lbl = ctk.CTkLabel(page_item, text=prefix_text, width=80, anchor="w")
-            prefix_lbl.grid(row=0, column=1, padx=(0, 4), pady=4, sticky="w")
+            # body entry: editable part only (placeholder visible if empty)
+            entry = ctk.CTkEntry(page_item, placeholder_text=base_name)
+            entry.grid(row=0, column=1, padx=(0, 6), pady=2, sticky="we")
 
-            # body entry: editable part only (user cannot delete the prefix label because it's a separate widget)
-            entry = ctk.CTkEntry(page_item, placeholder_text=f"Nombre Página {i+1}", width=200)
-            entry.grid(row=0, column=2, padx=(0, 6), pady=4, sticky="we")
-
-            # default body value is the base name (without prefix)
-            entry.insert(0, base_name)
-
-            # bind key event to mark user-edited entries (keeps flag if needed)
-            entry.bind("<KeyRelease>", lambda e, idx=i: self._on_entry_edited(idx))
+            # bind events to update combined label live and mark edits
+            entry.bind("<KeyRelease>", lambda e, idx=i: self._on_entry_key(idx))
+            entry.bind("<FocusOut>", lambda e, idx=i: self._on_entry_key(idx))
 
             # store widgets
-            self.pages_list_labels.append(page_label)
-            self.prefix_labels.append(prefix_lbl)
+            self.combined_labels.append(combined_lbl)
             self.rename_entries.append(entry)
 
-            # if manual rename is disabled, hide both prefix label and body entry
+            # if manual rename is disabled, hide combined label and body entry
             if not self.manual_rename_var.get():
-                prefix_lbl.grid_remove()
+                combined_lbl.grid_remove()
                 entry.grid_remove()
 
         self.split_button.configure(state="normal" if self.page_count > 0 else "disabled")
 
-    def _on_entry_edited(self, idx):
-        # mark that the user edited this entry (we keep this flag for other logic if needed)
+    def _on_entry_key(self, idx):
+        """
+        Update combined label for row idx to show: "Página N → PREFIJO_body"
+        If the body is empty, the combined label will show prefix only.
+        """
+        if idx < 0 or idx >= len(self.rename_entries):
+            return
+        entry = self.rename_entries[idx]
+        body = entry.get().strip()
+        prefix = self.prefix_var.get().strip()
+        prefix_text = f"{prefix}_" if prefix else ""
+        combined = f"Página {idx+1} → {prefix_text}{body}" if body else f"Página {idx+1}  →  {prefix_text}"
+        try:
+            self.combined_labels[idx].configure(text=combined)
+        except Exception:
+            pass
+        # mark edited
         if 0 <= idx < len(self.user_edited):
             self.user_edited[idx] = True
 
     def on_prefix_change(self):
         """
-        When prefix changes, update the readonly prefix label for every page.
-        Body entries remain editable and are not modified (only the prefix label changes).
-        This prevents users from deleting the prefix since it's not inside the editable widget.
+        When the prefix changes, update the combined label text for every page.
+        Also refresh each combined label with the current content of the corresponding entry.
         """
         new_prefix = self.prefix_var.get().strip()
         prefix_text = f"{new_prefix}_" if new_prefix else ""
-        for idx, prefix_lbl in enumerate(self.prefix_labels):
+        for idx, comb_lbl in enumerate(self.combined_labels):
             try:
-                prefix_lbl.configure(text=prefix_text)
+                body = ""
+                if idx < len(self.rename_entries):
+                    try:
+                        body = self.rename_entries[idx].get().strip()
+                    except Exception:
+                        body = ""
+                combined = f"Página {idx+1} → {prefix_text}{body}" if body else f"Página {idx+1} → {prefix_text}"
+                comb_lbl.configure(text=combined)
             except Exception:
-                # ignore if widget not available for some reason
                 pass
-        # update last_prefix for consistency
+        # update last_prefix
         self.last_prefix = new_prefix
 
     def on_toggle_manual_rename(self):
         enabled = self.manual_rename_var.get()
-        # show/hide prefix labels and body entries
-        for idx, (prefix_lbl, entry) in enumerate(zip(self.prefix_labels, self.rename_entries)):
+        for idx, (comb_lbl, entry) in enumerate(zip(self.combined_labels, self.rename_entries)):
             if enabled:
-                prefix_lbl.grid()
+                comb_lbl.grid()
                 entry.grid()
-                # if entry empty, set default base name
-                try:
-                    cur = entry.get().strip()
-                except Exception:
-                    cur = ""
-                if not cur:
-                    base = self.base_names[idx] if idx < len(self.base_names) else f"Página_{idx+1}"
-                    entry.delete(0, tk.END)
-                    entry.insert(0, base)
             else:
-                prefix_lbl.grid_remove()
+                comb_lbl.grid_remove()
                 entry.grid_remove()
+        # show/hide the rename note in preview panel: note appears when NOT renaming
+        if enabled:
+            try:
+                self.rename_note.grid_remove()
+            except Exception:
+                pass
+        else:
+            try:
+                self.rename_note.grid(row=0, column=0, sticky="w", padx=4, pady=(2,4))
+            except Exception:
+                pass
 
     def on_clear_names(self):
         """
-        Limpia el contenido de los campos dejando únicamente el prefijo visible.
-        Ahora, como el prefijo es un label separado, limpiamos solo la parte editable (body entries).
+        Limpia el contenido de los campos dejando únicamente el prefijo visible en the combined label.
         """
         for idx, entry in enumerate(self.rename_entries):
             try:
                 entry.delete(0, tk.END)
             except Exception:
                 pass
-            # reset user_edited flag so prefix updates still apply semantics if needed
             if idx < len(self.user_edited):
                 self.user_edited[idx] = False
-            # if manual mode off, keep them hidden
+            # refresh combined label to show prefix only
+            try:
+                prefix = self.prefix_var.get().strip()
+                prefix_text = f"{prefix}_" if prefix else ""
+                self.combined_labels[idx].configure(text=f"Página {idx+1}  →  {prefix_text}")
+            except Exception:
+                pass
             if not self.manual_rename_var.get():
                 entry.grid_remove()
-        messagebox.showinfo("Limpiar nombres", "Se han eliminado los nombres de las páginas dejando solo el prefijo visible.")
+        messagebox.showinfo("Limpiar nombres", "Se han eliminado los nombres editables dejando el prefijo visible en la vista.")
 
     def on_select_output_folder(self):
         folder = filedialog.askdirectory(title="Selecciona la carpeta de salida")
@@ -255,11 +292,6 @@ class PDFSplitterApp(ctk.CTkFrame):
         self.out_entry.insert(0, folder)
 
     def _ensure_unique_filename(self, path, existing_paths=None):
-        """
-        Asegura que 'path' no exista ya en disco ni en existing_paths (lista de paths ya creados en esta operación).
-        Si existe, añade sufijo " (1)", " (2)", ... antes de la extensión.
-        Devuelve la ruta única.
-        """
         existing_paths = set(existing_paths or [])
         base, ext = os.path.splitext(path)
         candidate = path
@@ -279,11 +311,25 @@ class PDFSplitterApp(ctk.CTkFrame):
             messagebox.showerror("Error", "La ruta del PDF no existe.")
             return
 
+        # If manual naming is enabled, validate that every editable field has a value (numero de documento)
+        if self.manual_rename_var.get():
+            empty_pages = []
+            for idx, entry in enumerate(self.rename_entries):
+                try:
+                    val = entry.get().strip()
+                except Exception:
+                    val = ""
+                if not val:
+                    empty_pages.append(str(idx+1))
+            if empty_pages:
+                pages_list = ", ".join(empty_pages)
+                messagebox.showerror("Campos vacíos", f"Todos los campos deben contener un número de documento.\nPáginas con campo vacío: {pages_list}")
+                return
+
         output_dir = self.out_entry.get().strip()
         if not output_dir:
             output_dir = os.path.dirname(pdf_path) or os.getcwd()
 
-        # Expand user (~) and get absolute path, then ensure the directory exists (create if needed)
         try:
             output_dir = os.path.abspath(os.path.expanduser(output_dir))
         except Exception:
@@ -305,22 +351,13 @@ class PDFSplitterApp(ctk.CTkFrame):
             created_files = []
             for i in range(num_pages):
                 if manual and i < len(self.rename_entries):
-                    # Body is the editable part only; prefix is taken from prefix_var
                     body = self.rename_entries[i].get().strip()
-                    if body:
-                        # if user typed something that accidentally includes the prefix, strip it to avoid duplication
-                        # (e.g., they pasted "OPF_nombre" into body) -> take text after first underscore
-                        if "_" in body and body.split("_", 1)[0] == prefix:
-                            body = body.split("_", 1)[1]
-                    else:
-                        body = self.base_names[i] if i < len(self.base_names) else f"Página_{i+1}"
+                    # if user accidentally pasted prefix into body, strip it
+                    if body and "_" in body and body.split("_", 1)[0] == prefix:
+                        body = body.split("_", 1)[1]
                     # compose final name with prefix if present
-                    if prefix:
-                        final_name = f"{prefix}_{body}"
-                    else:
-                        final_name = body
+                    final_name = f"{prefix}_{body}" if prefix else body
                 else:
-                    # no manual renaming -> use base name without prefix
                     final_name = self.base_names[i] if i < len(self.base_names) else f"Página_{i+1}"
 
                 safe_name = "".join(ch for ch in final_name if ch not in r'\/:*?"<>|').strip()
@@ -339,7 +376,6 @@ class PDFSplitterApp(ctk.CTkFrame):
 
             doc.close()
 
-            # Try to remove original and record last_split
             removed_original = False
             try:
                 os.remove(pdf_path)
@@ -377,14 +413,12 @@ class PDFSplitterApp(ctk.CTkFrame):
             messagebox.showinfo("Info", "No hay archivos para deshacer.")
             return
 
-        # If original file already exists, warn and abort
         if os.path.exists(orig):
             messagebox.showinfo("Info", "El archivo original ya existe. Operación de deshacer cancelada.")
             self.last_split = None
             self.undo_button.configure(state="disabled")
             return
 
-        # Attempt to reconstruct original by concatenating created page files in order
         try:
             new_doc = fitz.open()
             for page_file in created:
@@ -397,7 +431,6 @@ class PDFSplitterApp(ctk.CTkFrame):
             new_doc.close()
             print(f"[INFO] Original reconstruido en: {orig}")
 
-            # Now remove the created per-page files
             removed_any = []
             for f in created:
                 try:
@@ -409,7 +442,6 @@ class PDFSplitterApp(ctk.CTkFrame):
             message = f"Original reconstruido en: {orig}.\nSe eliminaron {len(removed_any)} archivos por página."
             messagebox.showinfo("Deshacer completado", message)
 
-            # Reset last_split
             self.last_split = None
             self.undo_button.configure(state="disabled")
 

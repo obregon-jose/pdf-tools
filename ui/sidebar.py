@@ -6,7 +6,7 @@ from core.config import APP_NAME
 
 class Sidebar(ctk.CTkFrame):
     def __init__(self, master, on_load_tool, on_home, on_settings, on_support):
-        super().__init__(master, width=220)
+        super().__init__(master, width=200)
         self.on_load_tool = on_load_tool
         self.on_home = on_home
         self.on_settings = on_settings
@@ -58,7 +58,7 @@ class Sidebar(ctk.CTkFrame):
             anchor="w",
             fg_color="transparent",
             text_color="#000000",
-            hover=False,
+            # hover=False,
             font=("Arial", 14, "bold"),
         )
         category_btn.pack(fill="x", padx=10, pady=(2, 0))
@@ -66,32 +66,6 @@ class Sidebar(ctk.CTkFrame):
         # Frame vacío (no empaquetado aún)
         tools_frame = ctk.CTkFrame(self, fg_color="transparent")
         tools_frame.visible = False
-
-        # def close_current_open():
-        #     """Cierra el tools_frame que esté abierto (si existe)."""
-        #     if self._open_tools_frame and self._open_tools_frame is not tools_frame:
-        #         try:
-        #             for w in self._open_tools_frame.winfo_children():
-        #                 w.destroy()
-        #             self._open_tools_frame.pack_forget()
-        #         except Exception:
-        #             pass
-        #         # Resetear texto del botón abierto anterior
-        #         if self._open_category_btn:
-        #             try:
-        #                 # extraer el nombre de la categoría actual para poner la flecha cerrada
-        #                 text = self._open_category_btn.cget("text")
-        #                 # si la flecha está abierta, reemplazar por cerrada
-        #                 if text.startswith("▾"):
-        #                     new = "▸" + text[1:]
-        #                     self._open_category_btn.configure(text=new)
-        #                 else:
-        #                     # fallback: ante cualquier duda, prefijar la flecha cerrada con su texto actual (sin cambios)
-        #                     pass
-        #             except Exception:
-        #                 pass
-        #     self._open_tools_frame = None
-        #     self._open_category_btn = None
 
         def toggle():
             nonlocal tools_frame
@@ -150,6 +124,6 @@ class Sidebar(ctk.CTkFrame):
                 # marcar como abierto
                 self._open_tools_frame = tools_frame
                 self._open_category_btn = category_btn
-                category_btn.configure(text=f"▾ {category}")
+                category_btn.configure(text=f"▾ {category} ({len(tools)})")
 
         category_btn.configure(command=toggle)

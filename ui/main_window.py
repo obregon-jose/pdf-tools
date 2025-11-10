@@ -62,8 +62,8 @@ class MainWindow(ctk.CTkFrame):
 
     # Determinar columnas (1 o 2 según ancho)
     def _determine_cols(self):
-        width = self.grid_frame.winfo_width() or self.content.winfo_width() or 800
-        return 2 if width > 700 else 1
+        width = self.grid_frame.winfo_width() or self.content.winfo_width() or 600
+        return 2 if width > 500 else 1
 
     def _build_or_update_grid(self, force=False):
         if not self.grid_frame:
@@ -129,14 +129,14 @@ class MainWindow(ctk.CTkFrame):
         card._title.configure(text=tool["name"])
         card._desc.configure(text=tool["description"])
 
-        total_width = self.grid_frame.winfo_width() or 800
+        total_width = self.grid_frame.winfo_width() or 600
         wrap = int((total_width / max(cols, 1)) * 0.85)
         card._desc.configure(wraplength=wrap)
 
         card._btn.configure(command=lambda t=tool["name"]: self.load_tool(t))
 
     def _adjust_wraplength(self, cols):
-        total_width = self.grid_frame.winfo_width() or 800
+        total_width = self.grid_frame.winfo_width() or 600
         wrap = int((total_width / max(cols, 1)) * 0.85)
         for card in self._cards[:len(TOOLS_REGISTRY)]:
             card._desc.configure(wraplength=wrap)
