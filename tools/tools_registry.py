@@ -24,7 +24,7 @@ TOOLS_REGISTRY = [
         "name": "Dividir PDFs",
         "description": "Divide un archivo PDF en múltiples archivos según el número de páginas.",
         "category": "PDF",
-        "class": PDFSplitterApp,
+        "class": BaseTool,
     },
     {
         "name": "Separar Registros",
@@ -48,7 +48,7 @@ TOOLS_REGISTRY = [
         "name": "Separar Ordenes",
         "description": "Divide un archivo PDF de órdenes en múltiples archivos individuales por paciente.",
         "category": "PDF",
-        "class": BaseTool,
+        "class": PDFSplitterApp,
     },
     {
         "name": "Revisar RIPS",
