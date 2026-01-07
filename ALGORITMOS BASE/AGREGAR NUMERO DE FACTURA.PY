@@ -251,7 +251,7 @@ class RenameApp:
                 summary_lines.append(f"{os.path.basename(o)}  ->  {os.path.relpath(n, start=self.folder_path.get())}   [{reason}]")
 
         if confirm:
-            if not messagebox.askokcancel("Confirmar renombrado", "Se renombrarán los siguientes archivos:\n\n" + "\n".join(summary_lines)):
+            if not messagebox.askokcancel("Confirmar renombrado", "Esta seguro que decea renombras todos los archviso?"):
                 return
 
         # Perform renaming

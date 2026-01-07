@@ -1,24 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-#
-# merge_pdfs_by_group.py
-#
-# Versión adaptada según petición:
-# - Interfaz con "modo acordeón" para mostrar cada grupo desplegable.
-# - Al unir: todos los archivos originales se MUEVEN a una carpeta "grupos".
-# - Los archivos unidos se guardan en una carpeta "unidos".
-# - El archivo unido queda con el nombre del grupo (parte del nombre hasta el primer espacio),
-#   sin el espacio ni caracteres extra.
-#
-# Requiere: Python 3.6+
-# Recomendado: instalar pypdf (pip install pypdf) o PyPDF2 como alternativa.
-#
-# Uso: python merge_pdfs_by_group.py
-#
-# Nota: la UI presenta controles para previsualizar, seleccionar grupos y unir.
-#       Las carpetas "grupos" y "unidos" se crean dentro de la carpeta seleccionada.
 
 import os
+
 import shutil
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox

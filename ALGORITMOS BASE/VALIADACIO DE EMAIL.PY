@@ -123,11 +123,7 @@ def revisar_mismo_archivo():
     else:
         messagebox.showinfo("Sin archivo", "Primero debes cargar un archivo Excel.")
 
-def limpiar():
-    resultado_text.config(state="normal")
-    resultado_text.delete(1.0, tk.END)
-    resultado_text.config(state="disabled")
-    estado_label.config(text="🧹 Limpio. Esperando archivo...")
+
 
 # --------- Interfaz Gráfica --------------
 
@@ -143,9 +139,6 @@ frame_botones.pack()
 
 tk.Button(frame_botones, text="📂 Cargar Excel", command=cargar_excel, font=("Arial", 12), bg="#2196F3", fg="white", width=18).pack(side=tk.LEFT, padx=10)
 tk.Button(frame_botones, text="🔁 Revisar Mismo Archivo", command=revisar_mismo_archivo, font=("Arial", 12), bg="#FFC107", fg="black", width=20).pack(side=tk.LEFT, padx=10)
-tk.Button(frame_botones, text="🧹 Limpiar Resultados", command=limpiar, font=("Arial", 12), bg="#f44336", fg="white", width=18).pack(side=tk.LEFT, padx=10)
-
-tk.Label(ventana, text="🔍 Resultados de validación (solo errores):", font=("Arial", 12), bg="#f4f4f4").pack(pady=(20, 5))
 
 resultado_text = scrolledtext.ScrolledText(ventana, width=95, height=24, font=("Courier", 10))
 resultado_text.pack(padx=20, pady=10)
