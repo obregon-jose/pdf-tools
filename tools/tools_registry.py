@@ -1,5 +1,6 @@
 from tools.base import BaseTool
 from tools.pdf_splitter import PDFSplitterApp
+from tools.pdf_page_deleter import PDFPageDeleterApp
 from tools.horus import Horus
 
 TOOLS_REGISTRY = [
@@ -51,12 +52,12 @@ TOOLS_REGISTRY = [
         "category": "PDF",
         "class": PDFSplitterApp,
     },
-    # {
-    #     "name": "Revisar RIPS",
-    #     "description": "Permite revisar los RIPS generados por la plataforma.",
-    #     "category": "Revisión",
-    #     "class": BaseTool,
-    # },
+    {
+        "name": "Eliminar paginas de un archivo pdf",
+        "description": "Permite eliminar páginas específicas de un archivo PDF.",
+        "category": "PDF",
+        "class": PDFPageDeleterApp,
+    },
     # {
     #     "name": "",
     #     "description": "",
