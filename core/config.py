@@ -1,7 +1,7 @@
 import os
 import json
 
-APP_NAME = "Su Factura"
+APP_NAME = "PDF Tools"
 VERSION = "1.0.0"
 
 

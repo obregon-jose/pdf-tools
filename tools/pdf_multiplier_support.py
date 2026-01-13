@@ -6,23 +6,75 @@ from tkinter import filedialog, messagebox
 from typing import Optional, List, Dict
 
 
-# ==================== CONFIGURACIÓN ====================
-ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("blue")
+class CTkTextboxWithPlaceholder(ctk. CTkTextbox):
+    """CTkTextbox con soporte para placeholder text."""
+    
+    def __init__(self, master, placeholder_text="", placeholder_color="gray", **kwargs):
+        super().__init__(master, **kwargs)
+        
+        self.placeholder_text = placeholder_text
+        self.placeholder_color = placeholder_color
+        self.default_color = self._text_color
+        self.is_placeholder_active = False
+        
+        # Mostrar placeholder inicial
+        self._show_placeholder()
+        
+        # Bindings para manejar focus
+        self. bind("<FocusIn>", self._on_focus_in)
+        self.bind("<FocusOut>", self._on_focus_out)
+    
+    def _show_placeholder(self):
+        """Muestra el texto placeholder."""
+        self.delete("1.0", "end")
+        self.insert("1.0", self.placeholder_text)
+        self.configure(text_color=self.placeholder_color)
+        self.is_placeholder_active = True
+    
+    def _hide_placeholder(self):
+        """Oculta el placeholder."""
+        if self.is_placeholder_active:
+            self.delete("1.0", "end")
+            self.configure(text_color=self.default_color)
+            self.is_placeholder_active = False
+    
+    def _on_focus_in(self, event=None):
+        """Cuando el textbox recibe focus."""
+        if self.is_placeholder_active:
+            self._hide_placeholder()
+    
+    def _on_focus_out(self, event=None):
+        """Cuando el textbox pierde focus."""
+        content = self.get("1.0", "end").strip()
+        if not content:
+            self._show_placeholder()
+    
+    def get_content(self) -> str:
+        """Obtiene el contenido real (ignorando placeholder)."""
+        if self.is_placeholder_active:
+            return ""
+        return self.get("1.0", "end").strip()
+    
+    def clear(self):
+        """Limpia el contenido y muestra placeholder."""
+        self.delete("1.0", "end")
+        self._show_placeholder()
 
 
-class PDFMultiplierApp(ctk.CTkFrame):
+# ==================== APLICACIÓN PRINCIPAL ====================
+
+class PDFMultiplierSupportApp(ctk.CTkFrame):
     """
     Aplicación para multiplicar un PDF con diferentes nombres. 
-    Diseño basado en el modelo PDFSplitterApp. 
+    Diseño basado en el modelo PDFSplitterApp.
     """
     
     def __init__(self, master, go_home=None):
         super().__init__(master)
         
         # ===== ESTADO DE LA APLICACIÓN =====
-        self.pdf_path: Optional[str] = None
-        self.last_operation: Optional[Dict] = None  # Para deshacer
+        self.pdf_path:  Optional[str] = None
+        self.last_operation: Optional[Dict] = None
         
         # ===== CONSTRUIR UI =====
         self._create_widgets()
@@ -73,10 +125,10 @@ class PDFMultiplierApp(ctk.CTkFrame):
         btn_select_output.grid(row=1, column=2, padx=(0, 6), pady=4)
         
         # Fila 2: Prefijo
-        lbl_prefix = ctk. CTkLabel(top_frame, text="Prefijo:", width=60, anchor="w")
+        lbl_prefix = ctk.CTkLabel(top_frame, text="Prefijo:", width=60, anchor="w")
         lbl_prefix.grid(row=2, column=0, padx=(6, 4), pady=4, sticky="w")
         
-        self.prefix_entry = ctk.CTkEntry(
+        self.prefix_entry = ctk. CTkEntry(
             top_frame,
             placeholder_text="Prefijo para los archivos (ej: CRC_900895359_IPSP)",
             width=500
@@ -95,7 +147,7 @@ class PDFMultiplierApp(ctk.CTkFrame):
         btn_frame.grid_columnconfigure(1, weight=1)
         btn_frame.grid_columnconfigure(2, weight=1)
         
-        self.multiply_button = ctk.CTkButton(
+        self.multiply_button = ctk. CTkButton(
             btn_frame,
             text="📄 Generar Multiplicados",
             command=self._on_multiply,
@@ -103,7 +155,7 @@ class PDFMultiplierApp(ctk.CTkFrame):
         )
         self.multiply_button.grid(row=0, column=0, padx=6, pady=4, sticky="we")
         
-        self. undo_button = ctk.CTkButton(
+        self.undo_button = ctk.CTkButton(
             btn_frame,
             text="↶ Deshacer",
             command=self._on_undo,
@@ -124,7 +176,7 @@ class PDFMultiplierApp(ctk.CTkFrame):
         
         # ===== PANEL DE DOCUMENTOS =====
         self.docs_frame = ctk.CTkFrame(self)
-        self.docs_frame.pack(fill="both", expand=True, padx=6, pady=6)
+        self.docs_frame. pack(fill="both", expand=True, padx=6, pady=6)
         
         # Nota informativa
         self.info_note = ctk.CTkLabel(
@@ -135,16 +187,17 @@ class PDFMultiplierApp(ctk.CTkFrame):
         )
         self.info_note.pack(anchor="w", padx=4, pady=(2, 4))
         
-        # Área de texto para documentos
-        self.docs_textbox = ctk.CTkTextbox(
+        # Área de texto con placeholder
+        placeholder = "Ejemplo:\nTI1001234567\nRC1098765430\nCC52123456\n\nIngresa un documento por línea..."
+        
+        self.docs_textbox = CTkTextboxWithPlaceholder(
             self.docs_frame,
+            placeholder_text=placeholder,
+            placeholder_color="gray50",
             height=200,
             font=ctk.CTkFont(family="Consolas", size=12)
         )
         self.docs_textbox.pack(fill="both", expand=True, padx=4, pady=2)
-        
-        # Ejemplo placeholder
-        self.docs_textbox.insert("1.0", "# Ejemplo:\n1001234567\n1009876543\n52123456")
     
     # ==================== EVENTOS ====================
     
@@ -152,12 +205,12 @@ class PDFMultiplierApp(ctk.CTkFrame):
         """Selecciona el archivo PDF."""
         file_path = filedialog.askopenfilename(
             title="Seleccionar archivo PDF",
-            filetypes=[("Archivos PDF", "*. pdf")]
+            filetypes=[("Archivos PDF", "*.pdf")]
         )
         
         if file_path:
-            self.pdf_path = file_path
-            self. pdf_entry.delete(0, tk.END)
+            self. pdf_path = file_path
+            self.pdf_entry.delete(0, tk.END)
             self.pdf_entry.insert(0, file_path)
             
             # Auto-llenar carpeta de salida
@@ -170,19 +223,23 @@ class PDFMultiplierApp(ctk.CTkFrame):
         """Selecciona la carpeta de salida."""
         folder = filedialog.askdirectory(title="Seleccionar carpeta de salida")
         if folder:
-            self.output_entry.delete(0, tk. END)
-            self.output_entry.insert(0, folder)
+            self.output_entry. delete(0, tk.END)
+            self.output_entry. insert(0, folder)
     
     def _on_clear(self):
-        """Limpia todos los campos."""
-        self.docs_textbox.delete("1.0", "end")
+        """Limpia el campo de documentos."""
+        self.docs_textbox.clear()
         messagebox.showinfo("Limpiar", "Se ha limpiado el listado de documentos.")
     
     # ==================== OPERACIONES ====================
     
     def _get_document_list(self) -> List[str]:
         """Obtiene la lista de documentos del textbox."""
-        text = self.docs_textbox. get("1.0", "end").strip()
+        text = self.docs_textbox. get_content()
+        
+        if not text: 
+            return []
+        
         lines = text.split('\n')
         
         # Filtrar líneas vacías y comentarios
@@ -217,13 +274,13 @@ class PDFMultiplierApp(ctk.CTkFrame):
             return
         
         if not os.path.exists(pdf_path):
-            messagebox.showerror("Error", f"El archivo no existe:\n{pdf_path}")
+            messagebox. showerror("Error", f"El archivo no existe:\n{pdf_path}")
             return
         
         # Obtener prefijo
         prefix = self.prefix_entry.get().strip()
         if not prefix:
-            messagebox. showerror("Error", "Por favor, ingresa un prefijo.")
+            messagebox.showerror("Error", "Por favor, ingresa un prefijo.")
             return
         
         # Obtener lista de documentos
@@ -243,11 +300,11 @@ class PDFMultiplierApp(ctk.CTkFrame):
             output_dir = os.path.dirname(pdf_path)
         
         # Crear carpeta si no existe
-        if not os.path.exists(output_dir):
+        if not os. path.exists(output_dir):
             try:
                 os.makedirs(output_dir)
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo crear la carpeta:\n{e}")
+                messagebox. showerror("Error", f"No se pudo crear la carpeta:\n{e}")
                 return
         
         # Confirmar operación
@@ -269,7 +326,7 @@ class PDFMultiplierApp(ctk.CTkFrame):
             
             for document in documents:
                 # Generar nombre del archivo
-                file_name = f"{prefix}_{document}.pdf"
+                file_name = f"{prefix}_{document}. pdf"
                 file_path = os.path.join(output_dir, file_name)
                 
                 # Evitar sobrescribir
@@ -278,7 +335,7 @@ class PDFMultiplierApp(ctk.CTkFrame):
                 # Crear copia del PDF
                 new_pdf = fitz.open()
                 new_pdf.insert_pdf(doc)
-                new_pdf. save(file_path, garbage=4, deflate=True)
+                new_pdf.save(file_path, garbage=4, deflate=True)
                 new_pdf.close()
                 
                 created_files.append(file_path)
@@ -310,7 +367,7 @@ class PDFMultiplierApp(ctk.CTkFrame):
                 msg += "\nEl archivo original ha sido eliminado."
             messagebox.showinfo("Éxito", msg)
             
-        except Exception as e:
+        except Exception as e: 
             messagebox.showerror("Error", f"Hubo un error:\n{e}")
             print(f"[ERROR] {e}")
     
@@ -327,12 +384,12 @@ class PDFMultiplierApp(ctk.CTkFrame):
         if not created_files:
             messagebox.showinfo("Info", "No hay archivos para eliminar.")
             self.last_operation = None
-            self.undo_button.configure(state="disabled")
+            self. undo_button.configure(state="disabled")
             return
         
         # Confirmar
         msg = f"¿Eliminar {len(created_files)} archivos creados?"
-        if original_removed: 
+        if original_removed:
             msg += "\n\n⚠️ El archivo original fue eliminado y se reconstruirá desde una de las copias."
         
         response = messagebox.askyesno("Confirmar Deshacer", msg)
@@ -346,12 +403,11 @@ class PDFMultiplierApp(ctk.CTkFrame):
                 first_copy = created_files[0]
                 if os.path.exists(first_copy):
                     try:
-                        # Copiar la primera copia como el original
                         doc = fitz.open(first_copy)
                         doc.save(original_path, garbage=4, deflate=True)
                         doc.close()
                         print(f"[INFO] Original restaurado: {original_path}")
-                    except Exception as e:
+                    except Exception as e: 
                         print(f"[WARN] No se pudo restaurar el original: {e}")
             
             # Eliminar archivos creados
@@ -371,24 +427,11 @@ class PDFMultiplierApp(ctk.CTkFrame):
             )
             
             self.last_operation = None
-            self.undo_button.configure(state="disabled")
+            self.undo_button. configure(state="disabled")
             
-        except Exception as e:
+        except Exception as e: 
             messagebox.showerror("Error", f"No se pudo deshacer:\n{e}")
             print(f"[ERROR] Deshacer:  {e}")
 
 
-# ==================== PUNTO DE ENTRADA ====================
-if __name__ == "__main__": 
-    root = ctk.CTk()
-    root.title("📄 Multiplicar Soportes PDF")
-    root.geometry("850x550")
-    root.minsize(750, 450)
-    
-    root.grid_columnconfigure(0, weight=1)
-    root.grid_rowconfigure(0, weight=1)
-    
-    app = PDFMultiplierApp(root)
-    app.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-    
-    root.mainloop()
+

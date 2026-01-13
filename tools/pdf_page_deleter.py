@@ -3,443 +3,320 @@ import fitz
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog, messagebox
-
+from PIL import Image
+from io import BytesIO
+import threading
 
 
 class PDFPageDeleterApp(ctk.CTkFrame):
-    def __init__(self, master, go_home):
+    """
+    Aplicación para eliminar páginas de documentos PDF. 
+    Diseño basado en el modelo PDFSplitterApp.
+    """
+    
+    def __init__(self, master, go_home=None):
         super().__init__(master)
         
-        # ===== STATE CENTRALIZED =====
+        # ===== ESTADO DE LA APLICACIÓN =====
         # Archivo y documento
         self.pdf_path = ""
-        self. pdf_doc = None
+        self.pdf_doc = None
         
         # Páginas y selección
         self.page_count = 0
         self.check_vars = []              # Variables observables para checkboxes
         self.checkboxes = []              # Widgets de checkbox
         self.thumbnails = []              # Cache de imágenes CTkImage
+        self.page_cards = []              # Cards de cada página
         
         # Configuración de layout
-        self.num_columnas = 5             # Columnas responsive
-        self.last_num_columnas = 5
+        self.num_columns = 5
+        self.last_num_columns = 5
         
         # Operación y historial
         self.last_operation = None        # {'original': path, 'created': path, 'deleted_pages': [... ]}
-        self.loading = False              # Flag de carga
+        self.is_loading = False
         
-        # Entradas del usuario (para observar cambios)
-        self.carpeta_salida_var = ctk.StringVar()
-        self.nombre_archivo_var = ctk.StringVar()
+        # ===== CONSTRUIR UI =====
+        self._create_widgets()
         
-        # ===== CONFIGURACIÓN GENERAL =====
-        # ===== BUILD UI =====
-        self._crear_ui()
-        
-        # ===== EVENT BINDING =====
-        self.master.bind("<Configure>", self._on_window_resize)
+        # ===== BINDING DE EVENTOS =====
+        self. master.bind("<Configure>", self._on_window_resize)
     
-    # ==================== UI BUILDING ====================
+    # ==================== CONSTRUCCIÓN DE UI ====================
     
-    def _crear_ui(self):
-        """Crea la interfaz completa"""
-        self.pack(fill="both", expand=True)
+    def _create_widgets(self):
+        """Crea todos los widgets de la interfaz siguiendo el diseño del modelo."""
         
-        self._crear_header()
-        self._crear_top_frame()
-        self._crear_frame_paginas()
-    
-    def _crear_header(self):
-        """Header con título y subtítulo"""
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", padx=20, pady=(20, 10))
-        
-        lbl_titulo = ctk.CTkLabel(
-            header_frame,
-            text="📄 Editor de Páginas PDF",
-            font=ctk.CTkFont(size=28, weight="bold")
-        )
-        lbl_titulo. pack()
-        
-        lbl_subtitulo = ctk.CTkLabel(
-            header_frame,
-            text="Elimina páginas de tus documentos PDF de forma rápida y sencilla",
-            font=ctk.CTkFont(size=13),
-            text_color="gray60"
-        )
-        lbl_subtitulo.pack(pady=(5, 0))
-    
-    def _crear_top_frame(self):
-        """Frame superior con controles de entrada/salida - ESTILO PDFSplitterApp"""
-        top_frame = ctk.CTkFrame(self, corner_radius=15)
+        # ===== FRAME SUPERIOR (contenedor único con espaciado compacto) =====
+        top_frame = ctk.CTkFrame(self)
         top_frame.pack(fill="x", padx=6, pady=6)
-        top_frame.grid_columnconfigure(1, weight=1)
         
-        # ===== Row 0:  PDF de entrada =====
-        lbl_pdf = ctk.CTkLabel(
-            top_frame,
-            text="PDF:",
-            width=40,
-            anchor="w",
-            font=ctk.CTkFont(size=12)
-        )
+        # Fila 0: PDF de entrada + botón seleccionar
+        lbl_pdf = ctk.CTkLabel(top_frame, text="PDF:", width=50, anchor="w")
         lbl_pdf.grid(row=0, column=0, padx=(6, 4), pady=4, sticky="w")
         
-        self.entrada_ruta = ctk.CTkEntry(
+        self.pdf_entry = ctk.CTkEntry(
             top_frame,
             placeholder_text="Escribe la ruta del PDF o usa Seleccionar",
-            width=500,
-            height=32,
-            font=ctk. CTkFont(size=11)
+            width=500
         )
-        self.entrada_ruta.grid(row=0, column=1, padx=(0, 6), pady=4, sticky="we")
-        self.entrada_ruta.bind("<Return>", lambda e: self.cargar_desde_entrada())
+        self.pdf_entry.grid(row=0, column=1, padx=(0, 6), pady=4, sticky="we")
+        self.pdf_entry.bind("<Return>", lambda e: self._load_from_entry())
         
-        btn_seleccionar = ctk. CTkButton(
+        btn_select_pdf = ctk.CTkButton(
             top_frame,
             text="Seleccionar PDF",
-            command=self.seleccionar_pdf,
             width=140,
-            height=32,
-            font=ctk. CTkFont(size=11, weight="bold"),
-            corner_radius=6
+            command=self._on_select_pdf
         )
-        btn_seleccionar.grid(row=0, column=2, padx=(0, 6), pady=4)
+        btn_select_pdf.grid(row=0, column=2, padx=(0, 6), pady=4)
         
-        # Info del archivo
-        self.lbl_info = ctk.CTkLabel(
-            top_frame,
-            text="",
-            font=ctk.CTkFont(size=10),
-            text_color="gray60",
-            anchor="w"
-        )
-        self.lbl_info.grid(row=1, column=1, columnspan=2, padx=(0, 6), pady=(0, 4), sticky="w")
+        # Fila 2: Carpeta de salida
+        lbl_output = ctk.CTkLabel(top_frame, text="Salida:", width=50, anchor="w")
+        lbl_output.grid(row=2, column=0, padx=(6, 4), pady=4, sticky="w")
         
-        # ===== Row 2: Carpeta de salida =====
-        lbl_salida = ctk.CTkLabel(
-            top_frame,
-            text="Salida:",
-            width=60,
-            anchor="w",
-            font=ctk.CTkFont(size=12)
-        )
-        lbl_salida.grid(row=2, column=0, padx=(6, 4), pady=4, sticky="w")
-        
-        self.entrada_salida = ctk.CTkEntry(
+        self.output_entry = ctk.CTkEntry(
             top_frame,
             placeholder_text="Carpeta de salida (opcional)",
-            width=420,
-            height=32,
-            font=ctk.CTkFont(size=11),
-            textvariable=self.carpeta_salida_var
+            width=420
         )
-        self.entrada_salida.grid(row=2, column=1, padx=(0, 6), pady=4, sticky="we")
+        self.output_entry.grid(row=2, column=1, padx=(0, 6), pady=4, sticky="we")
         
-        btn_carpeta = ctk.CTkButton(
+        btn_output_folder = ctk.CTkButton(
             top_frame,
             text="Seleccionar Carpeta",
-            command=self.seleccionar_carpeta_salida,
             width=140,
-            height=32,
-            font=ctk.CTkFont(size=11, weight="bold"),
-            corner_radius=6
+            command=self._on_select_output_folder
         )
-        btn_carpeta.grid(row=2, column=2, padx=(0, 6), pady=4)
+        btn_output_folder.grid(row=2, column=2, padx=(0, 6), pady=4)
         
-        # ===== Row 3: Nombre del archivo =====
-        lbl_nombre = ctk.CTkLabel(
+        # Fila 3: Nombre del archivo resultante
+        lbl_name = ctk.CTkLabel(top_frame, text="Nombre:", width=50, anchor="w")
+        lbl_name.grid(row=3, column=0, padx=(6, 4), pady=4, sticky="w")
+        
+        self. name_entry = ctk.CTkEntry(
             top_frame,
-            text="Nombre:",
-            width=60,
-            anchor="w",
-            font=ctk.CTkFont(size=12)
+            placeholder_text="Nombre del PDF resultante (sin extensión)",
+            width=500
         )
-        lbl_nombre.grid(row=3, column=0, padx=(6, 4), pady=4, sticky="w")
+        self.name_entry.grid(row=3, column=1, columnspan=2, padx=(0, 6), pady=4, sticky="we")
         
-        self.entrada_nombre = ctk.CTkEntry(
-            top_frame,
-            placeholder_text="Nombre del PDF resultante",
-            width=420,
-            height=32,
-            font=ctk.CTkFont(size=11),
-            textvariable=self.nombre_archivo_var
-        )
-        self.entrada_nombre.grid(row=3, column=1, columnspan=2, padx=(0, 6), pady=4, sticky="we")
-        
-        # ===== Row 4: Spacer (compacto) =====
+        # Fila 4: Espaciador pequeño (compacto)
         spacer = ctk.CTkFrame(top_frame, height=2)
-        spacer.grid(row=4, column=0, columnspan=3, sticky="we", padx=6, pady=(2, 4))
+        spacer.grid(row=4, column=0, columnspan=3)
         
-        # ===== Row 5: Botones de acción =====
-        btn_frame = ctk.CTkFrame(top_frame, fg_color="transparent")
-        btn_frame.grid(row=5, column=0, columnspan=3, sticky="we", padx=6, pady=(0, 6))
+        # Fila 5: Botones de acción (Eliminar, Deshacer, Limpiar selección)
+        btn_frame = ctk.CTkFrame(top_frame)
+        btn_frame.grid(row=5, column=0, columnspan=3, sticky="we", padx=6, pady=(0, 4))
         btn_frame.grid_columnconfigure(0, weight=1)
         btn_frame.grid_columnconfigure(1, weight=1)
         btn_frame.grid_columnconfigure(2, weight=1)
         
-        self.btn_eliminar = ctk.CTkButton(
+        self.delete_button = ctk.CTkButton(
             btn_frame,
             text="🗑️ Eliminar y Guardar",
-            command=self.eliminar_paginas,
-            height=40,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color="#1f6feb",
-            corner_radius=6
+            command=self._on_delete_pages,
+            fg_color="#1f6feb"  # Azul del modelo
         )
-        self.btn_eliminar.grid(row=0, column=0, padx=6, pady=4, sticky="we")
+        self.delete_button.grid(row=0, column=0, padx=6, pady=4, sticky="we")
         
-        self.btn_deshacer = ctk.CTkButton(
+        self. undo_button = ctk.CTkButton(
             btn_frame,
             text="↶ Deshacer",
-            command=self.deshacer,
-            height=40,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color="#f0ad4e",
-            text_color="black",
-            corner_radius=6,
-            state="disabled"
+            command=self._on_undo,
+            fg_color="#f0ad4e",  # Amarillo/naranja del modelo
+            text_color="black"
         )
-        self.btn_deshacer.grid(row=0, column=1, padx=6, pady=4, sticky="we")
+        self.undo_button.grid(row=0, column=1, padx=6, pady=4, sticky="we")
+        self.undo_button.configure(state="disabled")
         
-        self. btn_limpiar = ctk.CTkButton(
+        self.clear_button = ctk.CTkButton(
             btn_frame,
             text="🧹 Limpiar selección",
-            command=self._limpiar_seleccion,
-            height=40,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color="gray30",
-            corner_radius=6
+            command=self._on_clear_selection
         )
-        self.btn_limpiar.grid(row=0, column=2, padx=6, pady=4, sticky="we")
-    
-    def _crear_frame_paginas(self):
-        """Frame para mostrar páginas con grid responsivo"""
-        self.frame_paginas = ctk.CTkFrame(self, corner_radius=15)
-        self.frame_paginas.pack(fill="both", expand=True, padx=6, pady=6)
+        self.clear_button.grid(row=0, column=2, padx=6, pady=4, sticky="we")
         
-        # Header del frame
-        header_paginas = ctk.CTkFrame(self.frame_paginas, fg_color="transparent")
-        header_paginas.pack(fill="x", padx=6, pady=(6, 4))
-        header_paginas.grid_columnconfigure(1, weight=1)
+        top_frame.grid_columnconfigure(1, weight=1)
         
-        lbl_titulo_paginas = ctk.CTkLabel(
-            header_paginas,
-            text="📋 Páginas del documento",
-            font=ctk. CTkFont(size=14, weight="bold"),
-            anchor="w"
+        # ===== PANEL DE PÁGINAS (sin título, márgenes compactos) =====
+        self.pages_frame = ctk.CTkFrame(self)
+        self.pages_frame.pack(fill="both", expand=True, padx=6, pady=6)
+        
+        # Nota informativa en el panel de páginas
+        self.info_note = ctk.CTkLabel(
+            self.pages_frame,
+            text="Nota:  Marca las páginas que deseas eliminar del documento.",
+            text_color="gray",
+            font=("Arial", 12, "bold")
         )
-        lbl_titulo_paginas. grid(row=0, column=0, sticky="w")
+        self.info_note.grid(row=0, column=0, sticky="w", padx=4, pady=(2, 4))
         
-        self.lbl_contador = ctk.CTkLabel(
-            header_paginas,
+        # Contador de páginas seleccionadas
+        self.counter_label = ctk.CTkLabel(
+            self.pages_frame,
             text="",
-            font=ctk.CTkFont(size=11),
-            text_color="gray60",
+            text_color="gray",
             anchor="e"
         )
-        self.lbl_contador.grid(row=0, column=1, sticky="e")
+        self.counter_label.grid(row=0, column=1, sticky="e", padx=4, pady=(2, 4))
         
-        # Descripción
-        lbl_desc = ctk.CTkLabel(
-            self.frame_paginas,
-            text="Marca las páginas que deseas eliminar del documento",
-            font=ctk.CTkFont(size=10),
-            text_color="gray50",
-            anchor="w"
-        )
-        lbl_desc.pack(anchor="w", padx=6, pady=(0, 4))
-        
-        # ScrollableFrame con grid
+        # ScrollableFrame para las páginas (grid responsivo)
         self.scroll_frame = ctk.CTkScrollableFrame(
-            self. frame_paginas,
-            height=320,
-            fg_color="gray15",
-            corner_radius=10
+            self.pages_frame,
+            height=360
         )
-        self.scroll_frame.pack(fill="both", expand=True, padx=6, pady=(0, 6))
+        self.scroll_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=4, pady=2)
         
-        self._actualizar_grid_columnas()
+        self.pages_frame.grid_rowconfigure(1, weight=1)
+        self.pages_frame.grid_columnconfigure(0, weight=1)
+        
+        self._update_grid_columns()
     
-    # ==================== EVENT HANDLERS ====================
+    # ==================== MANEJADORES DE EVENTOS ====================
     
-    def _on_window_resize(self, event):
-        """Detecta cambios de tamaño y ajusta columnas"""
-        if event.widget != self.master:
-            return
-        
-        ancho = self.master.winfo_width()
-        
-        # Calcular columnas según ancho - IGUAL QUE ANTES
-        if ancho < 900:  
-            nuevas_columnas = 3
-        elif ancho < 1100:
-            nuevas_columnas = 4
-        elif ancho < 1300:
-            nuevas_columnas = 5
-        elif ancho < 1500:
-            nuevas_columnas = 6
-        else:
-            nuevas_columnas = 7
-        
-        # Si cambió, reorganizar
-        if nuevas_columnas != self.num_columnas and self.checkboxes:  
-            self. num_columnas = nuevas_columnas
-            self._reorganizar_grid()
-    
-    def _actualizar_grid_columnas(self):
-        """Configura grid con número correcto de columnas"""
-        # Limpiar configuración anterior
-        for i in range(10):
-            try:
-                self.scroll_frame.grid_columnconfigure(i, weight=0)
-            except:
-                pass
-        
-        # Configurar nuevas columnas
-        for i in range(self.num_columnas):
-            self.scroll_frame.grid_columnconfigure(i, weight=1)
-    
-    def _reorganizar_grid(self):
-        """Reorganiza widgets cuando cambian las columnas"""
-        if not self.checkboxes:
-            return
-        
-        self._actualizar_grid_columnas()
-        
-        for idx, checkbox in enumerate(self.checkboxes):
-            page_item = checkbox.master. master
-            fila = idx // self.num_columnas
-            columna = idx % self.num_columnas
-            
-            page_item.grid(row=fila, column=columna, padx=4, pady=4, sticky="n")
-    
-    # ==================== PDF LOADING ====================
-    
-    def seleccionar_pdf(self):
-        """Abre diálogo para seleccionar PDF"""
-        ruta = filedialog.askopenfilename(
+    def _on_select_pdf(self):
+        """Abre diálogo para seleccionar PDF."""
+        file_path = filedialog.askopenfilename(
             title="Seleccionar archivo PDF",
             filetypes=[("Archivos PDF", "*.pdf"), ("Todos los archivos", "*.*")]
         )
         
-        if ruta:
-            self.cargar_pdf(ruta)
+        if file_path:
+            self._load_pdf(file_path)
     
-    def cargar_desde_entrada(self):
-        """Carga PDF desde ruta escrita"""
-        ruta_escrita = self.entrada_ruta.get().strip()
+    def _load_from_entry(self):
+        """Carga PDF desde la ruta escrita en el entry."""
+        typed_path = self.pdf_entry.get().strip()
         
-        if not ruta_escrita:
+        if not typed_path: 
             return
         
-        # Resolver ruta
-        if not os.path.isabs(ruta_escrita):
+        # Resolver ruta relativa
+        if not os.path.isabs(typed_path):
             home = os.path.expanduser("~")
-            ruta_completa = os.path.join(home, ruta_escrita)
+            full_path = os.path.join(home, typed_path)
         else:
-            ruta_completa = ruta_escrita
+            full_path = typed_path
         
         # Validaciones
-        if not os.path. exists(ruta_completa):
-            messagebox.showerror("Error", f"El archivo no existe:\n{ruta_completa}")
+        if not os.path. exists(full_path):
+            messagebox.showerror("Error", f"El archivo no existe:\n{full_path}")
             return
         
-        if not ruta_completa.lower().endswith('.pdf'):
+        if not full_path.lower().endswith('.pdf'):
             messagebox.showerror("Error", "El archivo debe ser un PDF")
             return
         
-        self.cargar_pdf(ruta_completa)
+        self._load_pdf(full_path)
     
-    def cargar_pdf(self, ruta):
-        """Carga el PDF y actualiza UI"""
-        self.pdf_path = ruta
-        ruta_corta = self._obtener_ruta_corta(ruta)
+    def _on_select_output_folder(self):
+        """Selecciona carpeta de salida."""
+        folder = filedialog. askdirectory(title="Seleccionar carpeta de salida")
+        
+        if folder:
+            self.output_entry.delete(0, tk. END)
+            self.output_entry.insert(0, folder)
+    
+    def _on_window_resize(self, event):
+        """Detecta cambios de tamaño y ajusta columnas."""
+        if event.widget != self.master:
+            return
+        
+        width = self.master.winfo_width()
+        
+        # Calcular columnas según ancho
+        if width < 900:
+            new_columns = 3
+        elif width < 1100:
+            new_columns = 4
+        elif width < 1300:
+            new_columns = 5
+        elif width < 1500:
+            new_columns = 6
+        else:
+            new_columns = 7
+        
+        # Si cambió, reorganizar
+        if new_columns != self.num_columns and self.checkboxes:
+            self. num_columns = new_columns
+            self._reorganize_grid()
+    
+    def _on_clear_selection(self):
+        """Limpia todas las selecciones de checkboxes."""
+        for var in self.check_vars:
+            var.set(False)
+        self._update_counter()
+        messagebox.showinfo("Limpiar selección", "Se han deseleccionado todas las páginas.")
+    
+    # ==================== CARGA DE PDF ====================
+    
+    def _load_pdf(self, file_path):
+        """Carga el PDF y actualiza la UI."""
+        self.pdf_path = file_path
         
         try:
-            self.pdf_doc = fitz.open(ruta)
+            self.pdf_doc = fitz.open(file_path)
             self.page_count = len(self.pdf_doc)
-            tamaño_mb = os.path.getsize(ruta) / (1024 * 1024)
+            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
             
-            # Actualizar entradas
-            self.entrada_ruta. delete(0, "end")
-            self.entrada_ruta.insert(0, ruta_corta)
+            # Actualizar entry de ruta
+            self.pdf_entry.delete(0, tk.END)
+            self.pdf_entry.insert(0, file_path)
             
-            carpeta_entrada = os.path.dirname(ruta)
-            self.carpeta_salida_var.set(carpeta_entrada)
+            # Configurar carpeta de salida por defecto
+            input_folder = os.path.dirname(file_path)
+            self.output_entry.delete(0, tk.END)
+            self.output_entry.insert(0, input_folder)
             
-            nombre_base = os.path.splitext(os.path.basename(ruta))[0]
-            self. nombre_archivo_var.set(f"{nombre_base}_editado")
+            # Configurar nombre por defecto
+            base_name = os.path.splitext(os.path.basename(file_path))[0]
+            self.name_entry.delete(0, tk.END)
+            self.name_entry.insert(0, f"{base_name}_editado")
             
             # Actualizar info
-            self.lbl_info.configure(
-                text=f"✓ {self.page_count} páginas • {tamaño_mb:.2f} MB",
+            self. info_label.configure(
+                text=f"✓ {self.page_count} páginas • {file_size_mb:.2f} MB",
                 text_color="#10b981"
             )
             
-            # Cargar páginas en hilo
-            threading.Thread(target=self._cargar_paginas, daemon=True).start()
+            # Cargar páginas en hilo separado
+            threading.Thread(target=self._load_pages, daemon=True).start()
             
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo leer el PDF:\n{str(e)}")
+        except Exception as e: 
+            messagebox.showerror("Error", f"No se pudo abrir el PDF:\n{str(e)}")
             print(f"[ERROR] Cargar PDF: {e}")
     
-    def seleccionar_carpeta_salida(self):
-        """Selecciona carpeta de salida"""
-        carpeta = filedialog.askdirectory(title="Seleccionar carpeta de salida")
-        
-        if carpeta:
-            self.carpeta_salida_var.set(carpeta)
-    
-    @staticmethod
-    def _obtener_ruta_corta(ruta_completa):
-        """Obtiene ruta corta desde después de user/"""
+    def _generate_thumbnail(self, page_number):
+        """Genera miniatura de una página del PDF."""
         try:
-            ruta_normalizada = os.path.normpath(ruta_completa)
-            partes = ruta_normalizada. split(os.sep)
-            
-            for i, parte in enumerate(partes):
-                if parte. lower() in ['users', 'user', 'usuarios', 'usuario']:
-                    if i + 2 < len(partes):
-                        return os.sep.join(partes[i + 2:])
-            
-            return os.path.basename(ruta_completa)
-        except:
-            return os.path.basename(ruta_completa)
-    
-    # ==================== PAGE THUMBNAIL GENERATION ====================
-    
-    def _generar_miniatura(self, num_pagina):
-        """Genera miniatura ultra pequeña (0.2x) de una página"""
-        try:
-            pagina = self.pdf_doc[num_pagina]
-            pix = pagina.get_pixmap(matrix=fitz.Matrix(0.2, 0.2))
+            page = self.pdf_doc[page_number]
+            pix = page.get_pixmap(matrix=fitz.Matrix(0.2, 0.2))
             img_data = pix.tobytes("ppm")
             
-            imagen = Image.open(BytesIO(img_data))
-            return imagen
-        except Exception as e:  
-            print(f"[WARN] Error generando miniatura página {num_pagina}: {e}")
+            image = Image.open(BytesIO(img_data))
+            return image
+        except Exception as e:
+            print(f"[WARN] Error generando miniatura página {page_number}: {e}")
             return None
     
-    # ==================== PAGE LOADING ====================
-    
-    def _cargar_paginas(self):
-        """Carga checkboxes y miniaturas en grid responsivo - ESTILO COMPLETO"""
+    def _load_pages(self):
+        """Carga checkboxes y miniaturas en grid responsivo."""
         # Limpiar widgets anteriores
-        for widget in self.scroll_frame.winfo_children():
-            widget. destroy()
+        for widget in self. scroll_frame.winfo_children():
+            widget.destroy()
         
-        self. check_vars. clear()
-        self.checkboxes. clear()
+        self.check_vars. clear()
+        self.checkboxes.clear()
         self.thumbnails.clear()
+        self.page_cards.clear()
         
         try:
             for i in range(self.page_count):
                 var = ctk.BooleanVar()
                 
-                # Card de página - ULTRA COMPACTA
+                # Card de página compacta
                 page_card = ctk.CTkFrame(
                     self.scroll_frame,
                     fg_color="gray20",
@@ -448,9 +325,9 @@ class PDFPageDeleterApp(ctk.CTkFrame):
                     border_color="gray25"
                 )
                 
-                fila = i // self.num_columnas
-                columna = i % self. num_columnas
-                page_card.grid(row=fila, column=columna, padx=4, pady=4, sticky="n")
+                row = i // self.num_columns
+                col = i % self. num_columns
+                page_card.grid(row=row, column=col, padx=4, pady=4, sticky="n")
                 
                 # Contenedor vertical
                 content_frame = ctk.CTkFrame(page_card, fg_color="transparent")
@@ -458,11 +335,11 @@ class PDFPageDeleterApp(ctk.CTkFrame):
                 
                 # ===== MINIATURA CON NÚMERO DE PÁGINA =====
                 try:
-                    img = self._generar_miniatura(i)
-                    if img:
+                    img = self._generate_thumbnail(i)
+                    if img: 
                         img_width, img_height = img.size
                         
-                        # Frame para la miniatura y el número
+                        # Frame para la miniatura
                         thumb_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
                         thumb_frame.pack(fill="both", padx=0, pady=0)
                         
@@ -477,7 +354,7 @@ class PDFPageDeleterApp(ctk.CTkFrame):
                         lbl_img.pack(fill="both", padx=0, pady=0)
                         self.thumbnails.append(ctk_img)
                         
-                        # NÚMERO DE PÁGINA SUPERPUESTO EN LA MINIATURA
+                        # Número de página superpuesto
                         num_label = ctk.CTkLabel(
                             lbl_img,
                             text=f"Página {i + 1}",
@@ -486,190 +363,219 @@ class PDFPageDeleterApp(ctk.CTkFrame):
                             bg_color="transparent",
                             corner_radius=3
                         )
-                        # Posicionar en esquina inferior derecha
-                        num_label. place(relx=1, rely=1, anchor="se", padx=4, pady=4)
+                        num_label.place(relx=1, rely=1, anchor="se", padx=4, pady=4)
                         
                 except Exception as e:
                     print(f"[WARN] Error mostrando miniatura {i}: {e}")
+                    # Si falla la miniatura, mostrar placeholder
+                    placeholder = ctk.CTkLabel(
+                        content_frame,
+                        text=f"Página {i + 1}",
+                        font=ctk.CTkFont(size=11, weight="bold"),
+                        width=100,
+                        height=60
+                    )
+                    placeholder. pack(padx=4, pady=4)
                 
-                # ===== INFO Y CONTROLES =====
+                # ===== CHECKBOX ELIMINAR =====
                 info_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-                info_frame. pack(fill="x", padx=3, pady=3)
+                info_frame.pack(fill="x", padx=3, pady=3)
                 
-                # Checkbox con texto "ELIMINAR"
                 chk = ctk.CTkCheckBox(
                     info_frame,
                     text="Eliminar",
                     variable=var,
                     font=ctk.CTkFont(size=10, weight="bold"),
-                    command=self._actualizar_contador,
+                    command=self._update_counter,
                     corner_radius=3,
-                    width=20,
                     checkbox_width=18,
                     checkbox_height=18
                 )
-                chk.pack(anchor="w", pady=2, padx=2)
+                chk. pack(anchor="w", pady=2, padx=2)
                 
                 self.check_vars.append(var)
                 self.checkboxes.append(chk)
+                self.page_cards.append(page_card)
             
-            self._actualizar_contador()
+            self._update_counter()
             
         except Exception as e:
             messagebox.showerror("Error", f"Error al cargar las páginas:\n{str(e)}")
             print(f"[ERROR] Cargar páginas: {e}")
     
-    def _actualizar_contador(self):
-        """Actualiza el contador de páginas seleccionadas"""
-        seleccionadas = sum(1 for var in self. check_vars if var.get())
+    def _update_grid_columns(self):
+        """Configura grid con número correcto de columnas."""
+        # Limpiar configuración anterior
+        for i in range(10):
+            try:
+                self.scroll_frame.grid_columnconfigure(i, weight=0)
+            except:
+                pass
+        
+        # Configurar nuevas columnas
+        for i in range(self.num_columns):
+            self.scroll_frame.grid_columnconfigure(i, weight=1)
+    
+    def _reorganize_grid(self):
+        """Reorganiza widgets cuando cambian las columnas."""
+        if not self.page_cards:
+            return
+        
+        self._update_grid_columns()
+        
+        for idx, page_card in enumerate(self.page_cards):
+            row = idx // self.num_columns
+            col = idx % self. num_columns
+            page_card.grid(row=row, column=col, padx=4, pady=4, sticky="n")
+    
+    def _update_counter(self):
+        """Actualiza el contador de páginas seleccionadas."""
+        selected = sum(1 for var in self. check_vars if var.get())
         total = len(self.check_vars)
         
-        if seleccionadas > 0:
-            self.lbl_contador.configure(
-                text=f"🗑️ {seleccionadas} de {total} páginas para eliminar",
+        if selected > 0:
+            self.counter_label.configure(
+                text=f"🗑️ {selected} de {total} páginas para eliminar",
                 text_color="#ef4444"
             )
         else:
-            self.lbl_contador.configure(
+            self.counter_label.configure(
                 text=f"0 de {total} páginas seleccionadas",
-                text_color="gray60"
+                text_color="gray"
             )
     
-    def _limpiar_seleccion(self):
-        """Limpia todas las selecciones"""
-        for var in self.check_vars:
-            var.set(False)
-        self._actualizar_contador()
+    # ==================== OPERACIONES PDF ====================
     
-    # ==================== PDF OPERATIONS ====================
-    
-    def eliminar_paginas(self):
-        """Elimina las páginas seleccionadas y guarda el PDF"""
+    def _on_delete_pages(self):
+        """Elimina las páginas seleccionadas y guarda el PDF."""
         if not self.pdf_doc:
-            messagebox. showwarning("Advertencia", "Por favor, seleccione un archivo PDF primero")
+            messagebox. showwarning("Advertencia", "Por favor, seleccione un archivo PDF primero.")
             return
         
-        paginas_a_eliminar = [i for i, var in enumerate(self.check_vars) if var.get()]
+        pages_to_delete = [i for i, var in enumerate(self.check_vars) if var.get()]
         
-        if not paginas_a_eliminar:
-            messagebox.showwarning("Advertencia", "No ha seleccionado ninguna página para eliminar")
+        if not pages_to_delete:
+            messagebox. showwarning("Advertencia", "No ha seleccionado ninguna página para eliminar.")
             return
         
-        if len(paginas_a_eliminar) == self.page_count:
+        if len(pages_to_delete) == self.page_count:
             messagebox.showerror(
                 "Error",
                 "No se pueden eliminar todas las páginas.\nDebe quedar al menos una página en el PDF."
             )
             return
         
-        # Confirmar
-        respuesta = messagebox.askyesno(
+        # Confirmar operación
+        response = messagebox.askyesno(
             "Confirmar",
-            f"¿Está seguro de eliminar {len(paginas_a_eliminar)} página(s)?\n\n"
-            f"El PDF resultante tendrá {self.page_count - len(paginas_a_eliminar)} página(s)."
+            f"¿Está seguro de eliminar {len(pages_to_delete)} página(s)?\n\n"
+            f"El PDF resultante tendrá {self.page_count - len(pages_to_delete)} página(s)."
         )
         
-        if not respuesta:
+        if not response:
             return
         
         try:
-            # Crear documento nuevo
-            doc_nuevo = fitz.open()
+            # Crear documento nuevo con las páginas no eliminadas
+            new_doc = fitz.open()
             
             for i in range(self.page_count):
-                if i not in paginas_a_eliminar:
-                    doc_nuevo.insert_pdf(self.pdf_doc, from_page=i, to_page=i)
+                if i not in pages_to_delete:
+                    new_doc.insert_pdf(self.pdf_doc, from_page=i, to_page=i)
             
             # Obtener ruta de salida
-            ruta_salida = self._obtener_ruta_salida(paginas_a_eliminar)
+            output_path = self._get_output_path()
             
-            # Guardar
-            doc_nuevo.save(ruta_salida, garbage=4, deflate=True)
-            doc_nuevo.close()
+            # Guardar documento
+            new_doc.save(output_path, garbage=4, deflate=True)
+            new_doc.close()
             
             # Guardar estado para deshacer
-            self. last_operation = {
+            self.last_operation = {
                 'original':  self.pdf_path,
-                'created': ruta_salida,
-                'deleted_pages': paginas_a_eliminar. copy()
+                'created': output_path,
+                'deleted_pages': pages_to_delete. copy()
             }
             
-            self.btn_deshacer.configure(state="normal")
+            self. undo_button.configure(state="normal")
             
             # Mensaje de éxito
             messagebox.showinfo(
                 "Éxito",
                 f"✓ PDF generado correctamente\n\n"
-                f"{self.page_count - len(paginas_a_eliminar)} páginas guardadas en:\n{ruta_salida}"
+                f"{self.page_count - len(pages_to_delete)} páginas guardadas en:\n{output_path}"
             )
             
             # Limpiar selección
             for var in self.check_vars:
                 var.set(False)
-            self._actualizar_contador()
+            self._update_counter()
             
         except Exception as e:
             messagebox.showerror("Error", f"Error al procesar el PDF:\n{str(e)}")
             print(f"[ERROR] Eliminar páginas: {e}")
     
-    def _obtener_ruta_salida(self, paginas_eliminadas):
-        """Obtiene la ruta de salida con manejo de duplicados"""
-        carpeta_salida = self.carpeta_salida_var.get().strip()
-        if not carpeta_salida:  
-            carpeta_salida = os.path.dirname(self.pdf_path)
+    def _get_output_path(self):
+        """Obtiene la ruta de salida con manejo de duplicados."""
+        output_folder = self.output_entry.get().strip()
+        if not output_folder:
+            output_folder = os.path.dirname(self.pdf_path)
         
-        nombre_archivo = self.nombre_archivo_var.get().strip()
-        if not nombre_archivo: 
-            nombre_archivo = f"{os.path.splitext(os.path.basename(self.pdf_path))[0]}_editado"
+        file_name = self.name_entry.get().strip()
+        if not file_name:
+            file_name = f"{os.path.splitext(os.path.basename(self.pdf_path))[0]}_editado"
         
-        if nombre_archivo.lower().endswith('.pdf'):
-            nombre_archivo = nombre_archivo[:-4]
+        # Remover extensión si la incluyó el usuario
+        if file_name. lower().endswith('.pdf'):
+            file_name = file_name[:-4]
         
-        ruta_salida = os.path.join(carpeta_salida, f"{nombre_archivo}.pdf")
+        output_path = os.path.join(output_folder, f"{file_name}.pdf")
         
-        # Evitar duplicados
-        contador = 1
-        ruta_base = ruta_salida
-        while os.path.exists(ruta_salida):
-            nombre_sin_ext = os.path.splitext(ruta_base)[0]
-            ruta_salida = f"{nombre_sin_ext} ({contador}).pdf"
-            contador += 1
+        # Evitar sobrescribir archivos existentes
+        counter = 1
+        base_path = output_path
+        while os.path.exists(output_path):
+            name_without_ext = os.path.splitext(base_path)[0]
+            output_path = f"{name_without_ext} ({counter}).pdf"
+            counter += 1
         
-        return ruta_salida
+        return output_path
     
-    def deshacer(self):
-        """Deshace la última operación"""
-        if not self.last_operation:
-            messagebox.showinfo("Info", "No hay operación para deshacer")
+    def _on_undo(self):
+        """Deshace la última operación eliminando el archivo creado."""
+        if not self. last_operation:
+            messagebox.showinfo("Info", "No hay operación para deshacer.")
             return
         
-        archivo_creado = self.last_operation. get('created')
+        created_file = self.last_operation. get('created')
         
-        if not archivo_creado or not os.path.exists(archivo_creado):
-            messagebox.showwarning("Advertencia", "El archivo creado ya no existe")
+        if not created_file or not os.path.exists(created_file):
+            messagebox. showwarning("Advertencia", "El archivo creado ya no existe.")
             self.last_operation = None
-            self.btn_deshacer.configure(state="disabled")
+            self.undo_button.configure(state="disabled")
             return
         
-        respuesta = messagebox.askyesno(
+        response = messagebox.askyesno(
             "Confirmar Deshacer",
-            f"¿Está seguro de eliminar el archivo creado?\n\n{archivo_creado}"
+            f"¿Está seguro de eliminar el archivo creado?\n\n{created_file}"
         )
         
-        if not respuesta:
+        if not response: 
             return
         
-        try:
-            os.remove(archivo_creado)
+        try: 
+            os.remove(created_file)
             
             messagebox.showinfo(
                 "Deshacer completado",
-                f"El archivo ha sido eliminado:\n{archivo_creado}"
+                f"El archivo ha sido eliminado:\n{created_file}"
             )
             
             self.last_operation = None
-            self.btn_deshacer. configure(state="disabled")
+            self.undo_button.configure(state="disabled")
             
-        except Exception as e:  
+        except Exception as e:
             messagebox.showerror("Error", f"No se pudo eliminar el archivo:\n{str(e)}")
             print(f"[ERROR] Deshacer: {e}")
+
+
