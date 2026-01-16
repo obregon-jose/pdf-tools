@@ -125,8 +125,8 @@ class PDFSplitOrdersApp(ctk.CTkFrame):
         btn_select_pdf.grid(row=0, column=2, padx=(0, 6), pady=4)
         
         # Fila 1: Info del PDF
-        lbl_info_title = ctk.CTkLabel(top_frame, text="Info:", width=60, anchor="w")
-        lbl_info_title.grid(row=1, column=0, padx=(6, 4), pady=4, sticky="w")
+        # lbl_info_title = ctk.CTkLabel(top_frame, text="Info:", width=60, anchor="w")
+        # lbl_info_title.grid(row=1, column=0, padx=(6, 4), pady=4, sticky="w")
         
         # self.info_label = ctk.CTkLabel(
         #     top_frame,
@@ -207,19 +207,19 @@ class PDFSplitOrdersApp(ctk.CTkFrame):
         
         # ===== PANEL DE NOMBRES =====
         self.names_frame = ctk.CTkFrame(self)
-        self.names_frame.pack(fill="both", expand=True, padx=6, pady=6)
+        self.names_frame.pack(fill="both", expand=True, padx=4, pady=4)
         
         # Header con nota y contador
         header_frame = ctk.CTkFrame(self.names_frame, fg_color="transparent")
         header_frame.pack(fill="x", padx=4, pady=(2, 4))
         
-        self.info_note = ctk.CTkLabel(
-            header_frame,
-            text="Nota: Ingresa un nombre por línea.  La cantidad debe coincidir con las páginas del PDF.",
-            text_color="gray",
-            font=("Arial", 12, "bold")
-        )
-        self.info_note.pack(side="left")
+        # self.info_note = ctk.CTkLabel(
+        #     header_frame,
+        #     text="Nota: Ingresa un nombre por línea.  La cantidad debe coincidir con las páginas del PDF.",
+        #     text_color="gray",
+        #     font=("Arial", 12, "bold")
+        # )
+        # self.info_note.pack(side="left")
         
         self.counter_label = ctk.CTkLabel(
             header_frame,
@@ -313,7 +313,12 @@ class PDFSplitOrdersApp(ctk.CTkFrame):
             if names_count == self.page_count:
                 self.counter_label.configure(
                     text=f"✓ {names_count} nombres | {self.page_count} páginas",
-                    text_color="#10b981"
+                    text_color="green"
+                )
+            elif names_count > self.page_count:
+                self.counter_label.configure(
+                    text=f"✕ {names_count} nombres | {self.page_count} páginas",
+                    text_color="red"
                 )
             else:
                 self.counter_label.configure(

@@ -276,10 +276,10 @@ class PDFPageDeleterApp(ctk.CTkFrame):
             self.name_entry.insert(0, f"{base_name}_editado")
             
             # Actualizar info
-            self. info_label.configure(
-                text=f"✓ {self.page_count} páginas • {file_size_mb:.2f} MB",
-                text_color="#10b981"
-            )
+            # self. info_label.configure(
+            #     text=f"✓ {self.page_count} páginas • {file_size_mb:.2f} MB",
+            #     text_color="#10b981"
+            # )
             
             # Cargar páginas en hilo separado
             threading.Thread(target=self._load_pages, daemon=True).start()
