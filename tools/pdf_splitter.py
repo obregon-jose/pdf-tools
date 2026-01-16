@@ -16,11 +16,11 @@ class PDFSplitterApp(ctk.CTkFrame):
         # combined "Página N -> prefijo + contenido" labels (single label per row)
         self.combined_labels = []
         # Default: activar la opción de agregar nombres por página
-        self.manual_rename_var = ctk.BooleanVar(value=True)
+        self.manual_rename_var = ctk.BooleanVar(value=False)
         self.last_split = None       # {'original': path, 'created_files': [...]}
 
         # Additional state for prefix & preview behavior
-        self.prefix_var = tk.StringVar(value="OPF")
+        self.prefix_var = tk.StringVar(value="")
         self.base_names = []         # base names per page, e.g. "Página_1"
         self.user_edited = []        # optional flags per entry: True if user edited that entry
 
