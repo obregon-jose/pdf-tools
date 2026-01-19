@@ -4245,6 +4245,12 @@
   ('tools.pdf_splitter',
    'C:\\Users\\user\\Desktop\\JOSE\\ALGORITMOS\\RADICACION\\tools\\pdf_splitter.py',
    'PYMODULE'),
+<<<<<<< HEAD
+=======
+  ('tools.pdf_splitter2',
+   'C:\\Users\\user\\Desktop\\JOSE\\ALGORITMOS\\RADICACION\\tools\\pdf_splitter2.py',
+   'PYMODULE'),
+>>>>>>> c868c256cede4729820b43fb4ce69c15c9947006
   ('tools.tools_registry',
    'C:\\Users\\user\\Desktop\\JOSE\\ALGORITMOS\\RADICACION\\tools\\tools_registry.py',
    'PYMODULE'),
