@@ -1,6 +1,6 @@
 from tools.base import BaseTool
 from tools.pdf_splitter import PDFSplitterApp
-# from tools.pdf_splitter2 import PDFSplitterApp2
+from ALGORITMOS_BASE.pdf_splitter2 import PDFSplitterApp2
 from tools.pdf_page_deleter import PDFPageDeleterApp
 from tools.horus import HorusApp
 from tools.validate_emails import ValidateEmailApp
@@ -71,12 +71,12 @@ TOOLS_REGISTRY = [
     #     "category": "PDF",
     #     "class": BaseTool,
     # },
-    # {
-    #     "name": "Separar Ordenes 2",
-    #     "description": "Divide un archivo PDF en múltiples archivos individuales por paciente.",
-    #     "category": "PDF",
-    #     "class": PDFSplitterApp2,
-    # },
+    {
+        "name": "Extraer paginas de PDF",
+        "description": "",
+        "category": "PDF",
+        "class": PDFSplitterApp2,
+    },
     # {
     #     "name": "",
     #     "description": "",
