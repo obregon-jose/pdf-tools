@@ -8,6 +8,7 @@ from tools.pdf_merge import PDFMergerApp
 from tools.pdf_merge_group import PDFMergerGroupApp
 from tools.pdf_multiplier_support import PDFMultiplierSupportApp
 from tools.pdf_split_orders import PDFSplitOrdersApp
+from tools.carnet_virtual import CarnetVirtualApp
 
 TOOLS_REGISTRY = [
 
@@ -77,16 +78,16 @@ TOOLS_REGISTRY = [
         "category": "PDF",
         "class": PDFSplitterApp2,
     },
+    {
+        "name": "Base Carnet Virtual",
+        "description": "Genera el archivo masivo con las vacunas aplicadas listo para cargar al sistema",
+        "category": "VAXTHERA",
+        "class": CarnetVirtualApp,
+    },
     # {
-    #     "name": "",
-    #     "description": "",
-    #     "category": "",
-    #     "class": BaseTool,
-    # },
-    # {
-    #     "name": "",
-    #     "description": "",
-    #     "category": "",
+    #     "name": "Reporte POLIZA",
+    #     "description": "Genera el archivo de reporte de aplicaciones",
+    #     "category": "VAXTHERA",
     #     "class": BaseTool,
     # },
     # {
