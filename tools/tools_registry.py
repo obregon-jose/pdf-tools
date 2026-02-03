@@ -39,13 +39,13 @@ TOOLS_REGISTRY = [
     {
         "name": "Multiplicar Soportes CRC",
         "description": "Multiplica un archivo PDF con diferentes nombres de soporte.",
-        "category": "FACTURA",
+        "category": "RADICACIÓN",
         "class": PDFMultiplierSupportApp,
     },
     {
         "name": "Separar Ordenes OPF",
         "description": "Divide un archivo PDF de órdenes OPF en múltiples archivos individuales por paciente.",
-        "category": "FACTURA",
+        "category": "RADICACIÓN",
         "class": PDFSplitOrdersApp,
     },
     {

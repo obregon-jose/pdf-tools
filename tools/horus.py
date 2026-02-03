@@ -15,7 +15,7 @@ class HorusApp(ctk. CTkFrame):
     """
     
     # Constantes de la API
-    DOC_TYPES = {"CC": 1, "TI": 2, "RC": 3}
+    DOC_TYPES = {"CC": 1, "TI": 2, "RC": 3, "CE": 5, "CN": 12}
     LOGIN_URL = "https://backend.horus-health.com/api/auth/validar-usuario"
     BASE_URL = "https://backend.horus-health.com/api/afiliados/consultar-afiliado"
     

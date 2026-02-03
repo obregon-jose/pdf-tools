@@ -17,7 +17,7 @@ VACCINE_CATALOG = {
     
     'VPH': {
         'keywords': ['VPH', 'GARDASIL', 'PAPILOMA'],
-        'display_name': 'GARDASIL 9',
+        'display_name': 'GARDASIL',
         'description': 'el Virus del Papiloma Humano (GARDASIL 9)',
         'default_arm': 'IZQUIERDO',
         'jeringa': 'JERINGA PRELLENADA',
