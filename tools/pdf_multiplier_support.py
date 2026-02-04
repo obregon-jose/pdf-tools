@@ -1,18 +1,13 @@
 import os
 import re
-import fitz  # PyMuPDF
+import shutil
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from typing import Optional, List, Dict
 
+MAX_NOMBRES = 10
 
-# ==================== CONSTANTES ====================
-
-MAX_NOMBRES = 10  # Límite máximo de nombres permitidos
-
-
-# ==================== TEXTBOX CON PLACEHOLDER ====================
 
 class CTkTextboxWithPlaceholder(ctk.CTkTextbox):
     """CTkTextbox con soporte para placeholder text."""
@@ -26,500 +21,379 @@ class CTkTextboxWithPlaceholder(ctk.CTkTextbox):
         self.is_placeholder_active = False
         
         self._show_placeholder()
-        
         self.bind("<FocusIn>", self._on_focus_in)
         self.bind("<FocusOut>", self._on_focus_out)
+        self.bind("<Button-1>", self._on_click)
+        self.bind("<Key>", self._on_key_press)
     
     def _show_placeholder(self):
-        """Muestra el texto placeholder."""
         self.delete("1.0", "end")
         self.insert("1.0", self.placeholder_text)
         self.configure(text_color=self.placeholder_color)
         self.is_placeholder_active = True
     
     def _hide_placeholder(self):
-        """Oculta el texto placeholder."""
         if self.is_placeholder_active:
             self.delete("1.0", "end")
             self.configure(text_color=self.default_color)
             self.is_placeholder_active = False
     
+    def _on_click(self, event=None):
+        if self.is_placeholder_active:
+            self._hide_placeholder()
+    
     def _on_focus_in(self, event=None):
-        """Evento al enfocar el textbox."""
         if self.is_placeholder_active:
             self._hide_placeholder()
     
     def _on_focus_out(self, event=None):
-        """Evento al desenfocar el textbox."""
         content = self.get("1.0", "end").strip()
         if not content:
             self._show_placeholder()
     
+    def _on_key_press(self, event=None):
+        if self.is_placeholder_active:
+            self._hide_placeholder()
+    
     def get_content(self) -> str:
-        """Obtiene el contenido real (sin placeholder)."""
         if self.is_placeholder_active:
             return ""
         return self.get("1.0", "end").strip()
     
     def clear(self):
-        """Limpia el contenido y muestra el placeholder."""
-        self. delete("1.0", "end")
+        self.is_placeholder_active = False
+        self.delete("1.0", "end")
         self._show_placeholder()
 
-
-# ==================== UTILIDADES ====================
 
 def clean_filename(name: str) -> str:
     """Elimina caracteres no permitidos en nombres de archivo."""
     return re.sub(r'[\\/*?:"<>|]', "", name)
 
 
-def create_unique_path(base_path: str) -> str:
-    """Crea una ruta única si el archivo ya existe."""
-    if not os.path.exists(base_path):
-        return base_path
-    
-    base, ext = os.path.splitext(base_path)
-    counter = 2
-    
-    while True:
-        new_path = f"{base} ({counter}){ext}"
-        if not os.path.exists(new_path):
-            return new_path
-        counter += 1
-
-
-# ==================== APLICACIÓN PRINCIPAL ====================
-
 class PDFMultiplierSupportApp(ctk.CTkFrame):
-    """
-    Aplicación para multiplicar un PDF de 1 página con diferentes nombres.
-    Recibe un PDF de una página y lo duplica con cada nombre proporcionado.
-    Máximo 10 nombres permitidos. 
-    """
+    """Aplicación para multiplicar un PDF con diferentes nombres."""
     
     def __init__(self, master, go_home=None):
         super().__init__(master)
-        
-        # ===== ESTADO =====
-        self.pdf_path:  Optional[str] = None
+        self.pdf_path: Optional[str] = None
         self.last_operation: Optional[Dict] = None
-        self.page_count = 0
-        
-        # ===== CONSTRUIR UI =====
         self._create_widgets()
     
     def _create_widgets(self):
         """Crea todos los widgets de la interfaz."""
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
         
-        # ===== FRAME SUPERIOR =====
-        top_frame = ctk.CTkFrame(self)
-        top_frame.pack(fill="x", padx=6, pady=6)
+        self._build_top_panel()
+        self._build_main_panel()
+        self._build_log_panel()
+    
+    def _build_top_panel(self):
+        """Panel superior con controles."""
+        panel = ctk.CTkFrame(self)
+        panel.grid(row=0, column=0, sticky="ew", padx=6, pady=6)
+        panel.grid_columnconfigure(1, weight=1)
         
-        # Fila 0: PDF de entrada
-        lbl_pdf = ctk.CTkLabel(top_frame, text="PDF:", width=60, anchor="w")
-        lbl_pdf.grid(row=0, column=0, padx=(6, 4), pady=4, sticky="w")
+        # PDF de entrada
+        ctk.CTkLabel(panel, text="PDF:", width=60, anchor="w", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=(6,4), pady=4, sticky="w")
+        self.pdf_entry = ctk.CTkEntry(panel, placeholder_text="Selecciona el archivo PDF")
+        self.pdf_entry.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+        ctk.CTkButton(panel, text="Seleccionar PDF", width=130, command=self._on_select_pdf).grid(row=0, column=2, padx=(4,6), pady=4)
         
-        self.pdf_entry = ctk.CTkEntry(
-            top_frame,
-            placeholder_text="Selecciona el archivo PDF de 1 página",
-            width=500
-        )
-        self.pdf_entry.grid(row=0, column=1, padx=(0, 6), pady=4, sticky="we")
+        # Carpeta de salida
+        ctk.CTkLabel(panel, text="Salida:", width=60, anchor="w", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, padx=(6,4), pady=4, sticky="w")
+        self.output_entry = ctk.CTkEntry(panel, placeholder_text="Carpeta de salida (opcional)")
+        self.output_entry.grid(row=1, column=1, padx=4, pady=4, sticky="ew")
+        ctk.CTkButton(panel, text="Seleccionar", width=130, command=self._on_select_output).grid(row=1, column=2, padx=(4,6), pady=4)
         
-        btn_select_pdf = ctk.CTkButton(
-            top_frame,
-            text="Seleccionar PDF",
-            width=140,
-            command=self._on_select_pdf
-        )
-        btn_select_pdf.grid(row=0, column=2, padx=(0, 6), pady=4)
-        
-        # Fila 1: Info del PDF
-        # lbl_info_title = ctk.CTkLabel(top_frame, text="Info:", width=60, anchor="w")
-        # lbl_info_title.grid(row=1, column=0, padx=(6, 4), pady=4, sticky="w")
-        
-        # self.info_label = ctk.CTkLabel(
-        #     top_frame,
-        #     text="Ningún archivo seleccionado",
-        #     anchor="w",
-        #     text_color="gray"
-        # )
-        # self.info_label. grid(row=1, column=1, columnspan=2, padx=(0, 6), pady=4, sticky="w")
-        
-        # Fila 2: Carpeta de salida
-        lbl_output = ctk.CTkLabel(top_frame, text="Salida:", width=60, anchor="w")
-        lbl_output.grid(row=2, column=0, padx=(6, 4), pady=4, sticky="w")
-        
-        self.output_entry = ctk.CTkEntry(
-            top_frame,
-            placeholder_text="Carpeta de salida (opcional, usa la del PDF)",
-            width=500
-        )
-        self.output_entry.grid(row=2, column=1, padx=(0, 6), pady=4, sticky="we")
-        
-        btn_select_output = ctk. CTkButton(
-            top_frame,
-            text="Seleccionar Carpeta",
-            width=140,
-            command=self._on_select_output
-        )
-        btn_select_output.grid(row=2, column=2, padx=(0, 6), pady=4)
-        
-        # Fila 3: Prefijo
-        lbl_prefix = ctk.CTkLabel(top_frame, text="Prefijo:", width=60, anchor="w")
-        lbl_prefix.grid(row=3, column=0, padx=(6, 4), pady=4, sticky="w")
-        
-        self.prefix_entry = ctk.CTkEntry(
-            top_frame,
-            placeholder_text="Prefijo para los archivos",
-            width=500
-        )
-        self.prefix_entry.grid(row=3, column=1, columnspan=2, padx=(0, 6), pady=4, sticky="we")
+        # Prefijo
+        ctk.CTkLabel(panel, text="Prefijo:", width=60, anchor="w", font=ctk.CTkFont(weight="bold")).grid(row=2, column=0, padx=(6,4), pady=4, sticky="w")
+        self.prefix_entry = ctk.CTkEntry(panel)
+        self.prefix_entry.grid(row=2, column=1, columnspan=2, padx=4, pady=4, sticky="ew")
         self.prefix_entry.insert(0, "CRC_900895359_IPSP_")
         
-        # Fila 4: Espaciador
-        spacer = ctk.CTkFrame(top_frame, height=2)
-        spacer.grid(row=4, column=0, columnspan=3)
+        # Botones de acción
+        btn_frame = ctk.CTkFrame(panel, fg_color="transparent")
+        btn_frame.grid(row=3, column=0, columnspan=3, sticky="ew", padx=6, pady=(4,6))
+        btn_frame.grid_columnconfigure((0,1,2), weight=1)
         
-        # Fila 5: Botones de acción
-        btn_frame = ctk.CTkFrame(top_frame)
-        btn_frame.grid(row=5, column=0, columnspan=3, sticky="we", padx=6, pady=(0, 4))
-        btn_frame.grid_columnconfigure(0, weight=1)
-        btn_frame.grid_columnconfigure(1, weight=1)
-        btn_frame.grid_columnconfigure(2, weight=1)
+        self.process_btn = ctk.CTkButton(btn_frame, text="📄 Multiplicar PDF", command=self._on_process, fg_color="#1f6feb")
+        self.process_btn.grid(row=0, column=0, padx=4, pady=4, sticky="ew")
         
-        self.process_button = ctk.CTkButton(
-            btn_frame,
-            text="📄 Multiplicar PDF",
-            command=self._on_process,
-            fg_color="#1f6feb"
-        )
-        self.process_button.grid(row=0, column=0, padx=6, pady=4, sticky="we")
+        self.undo_btn = ctk.CTkButton(btn_frame, text="↶ Deshacer", command=self._on_undo, fg_color="#f0ad4e", text_color="black", state="disabled")
+        self.undo_btn.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
         
-        self.undo_button = ctk.CTkButton(
-            btn_frame,
-            text="↶ Deshacer",
-            command=self._on_undo,
-            fg_color="#f0ad4e",
-            text_color="black"
-        )
-        self.undo_button.grid(row=0, column=1, padx=6, pady=4, sticky="we")
-        self.undo_button.configure(state="disabled")
+        self.clear_btn = ctk.CTkButton(btn_frame, text="🧹 Limpiar", command=self._on_clear, fg_color="#e74c3c")
+        self.clear_btn.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+    
+    def _build_main_panel(self):
+        """Panel principal con nombres."""
+        panel = ctk.CTkFrame(self)
+        panel.grid(row=1, column=0, sticky="nsew", padx=6, pady=(0,6))
+        panel.grid_columnconfigure(0, weight=1)
+        panel.grid_rowconfigure(1, weight=1)
         
-        self.clear_button = ctk.CTkButton(
-            btn_frame,
-            text="🧹 Limpiar nombres",
-            command=self._on_clear
-        )
-        self.clear_button.grid(row=0, column=2, padx=6, pady=4, sticky="we")
+        # Header con nombre de archivo y contador
+        header = ctk.CTkFrame(panel, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=6, pady=(6,4))
+        header.grid_columnconfigure(0, weight=1)
         
-        top_frame.grid_columnconfigure(1, weight=1)
+        self.file_name_lbl = ctk.CTkLabel(header, text="📄 Ningún archivo seleccionado", text_color="gray", anchor="w", font=ctk.CTkFont(size=12))
+        self.file_name_lbl.grid(row=0, column=0, sticky="w")
         
-        # ===== PANEL DE NOMBRES =====
-        self.names_frame = ctk.CTkFrame(self)
-        self.names_frame.pack(fill="both", expand=True, padx=4, pady=4)
+        self.counter_lbl = ctk.CTkLabel(header, text=f"0 / {MAX_NOMBRES} nombres", text_color="gray", anchor="e")
+        self.counter_lbl.grid(row=0, column=1, sticky="e", padx=(10,0))
         
-        # Header con nota y contador
-        header_frame = ctk.CTkFrame(self.names_frame, fg_color="transparent")
-        header_frame.pack(fill="x", padx=4, pady=(2, 4))
-        
-        # self.info_note = ctk.CTkLabel(
-        #     header_frame,
-        #     text=f"📋 Ingresa hasta {MAX_NOMBRES} nombres (uno por línea). El PDF se duplicará con cada nombre.",
-        #     text_color="gray",
-        #     font=("Arial", 12, "bold")
-        # )
-        # self.info_note.pack(side="left")
-        
-        self.counter_label = ctk. CTkLabel(
-            header_frame,
-            text=f"0 / {MAX_NOMBRES} nombres",
-            text_color="gray"
-        )
-        self.counter_label.pack(side="right")
-        
-        # Área de texto con placeholder
+        # Textbox de nombres
         placeholder = (
             f"Ingresa los nombres para duplicar el PDF (máximo {MAX_NOMBRES}):\n\n"
             "Ejemplo:\n"
             "CC1234567890\n"
             "TI0987654321\n"
-            "RC1122334455\n\n"
-            "Se creará una copia del PDF por cada nombre..."
+            "RC1122334455"
         )
         
         self.names_textbox = CTkTextboxWithPlaceholder(
-            self.names_frame,
+            panel,
             placeholder_text=placeholder,
             placeholder_color="gray50",
-            height=250,
             font=ctk.CTkFont(family="Consolas", size=12)
         )
-        self.names_textbox.pack(fill="both", expand=True, padx=4, pady=2)
-        
-        # Binding para actualizar contador
+        self.names_textbox.grid(row=1, column=0, sticky="nsew", padx=6, pady=(0,6))
         self.names_textbox.bind("<KeyRelease>", self._update_counter)
     
-    # ==================== EVENTOS ====================
+    def _build_log_panel(self):
+        """Panel de log/informe."""
+        panel = ctk.CTkFrame(self)
+        panel.grid(row=2, column=0, sticky="ew", padx=6, pady=(0,6))
+        panel.grid_columnconfigure(0, weight=1)
+        
+        ctk.CTkLabel(panel, text="📋 Registro de operaciones", font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=0, sticky="w", padx=6, pady=(6,2))
+        
+        self.log_text = ctk.CTkTextbox(panel, height=100, font=ctk.CTkFont(family="Consolas", size=11))
+        self.log_text.grid(row=1, column=0, sticky="ew", padx=6, pady=(0,6))
+        self.log_text.configure(state="disabled")
+        
+        self._log("INFO", "Listo para comenzar.")
+    
+    def _log(self, level: str, message: str):
+        """Agrega un mensaje al log."""
+        colors = {
+            "INFO": "#7f8c8d",
+            "OK": "#27ae60",
+            "WARNING": "#f39c12",
+            "ERROR": "#e74c3c"
+        }
+        
+        self.log_text.configure(state="normal")
+        self.log_text.insert("end", f"[{level}] {message}\n")
+        
+        # Aplicar color
+        last_line = self.log_text.index("end-2l")
+        self.log_text.tag_add(level, last_line, "end-1c")
+        self.log_text.tag_config(level, foreground=colors.get(level, "white"))
+        
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+        self.update()
     
     def _on_select_pdf(self):
-        """Selecciona el archivo PDF."""
-        file_path = filedialog.askopenfilename(
-            title="Seleccionar archivo PDF (1 página)",
-            filetypes=[("Archivos PDF", "*.pdf")]
-        )
-        
-        if file_path:
-            self. pdf_path = file_path
-            self.pdf_entry.delete(0, tk.END)
-            self.pdf_entry.insert(0, file_path)
-            
-            # Auto-llenar carpeta de salida
-            if not self.output_entry.get().strip():
-                output_dir = os.path.dirname(file_path)
-                self.output_entry.delete(0, tk.END)
-                self.output_entry.insert(0, output_dir)
-            
-            self._load_pdf_info()
-    
-    def _load_pdf_info(self):
-        """Carga información del PDF y valida que tenga 1 página."""
-        pdf_path = self.pdf_entry.get().strip()
-        
-        if not pdf_path or not os.path.exists(pdf_path):
+        """Selecciona archivo PDF."""
+        path = filedialog.askopenfilename(title="Seleccionar PDF", filetypes=[("PDF", "*.pdf")])
+        if not path:
             return
         
-        try:
-            doc = fitz.open(pdf_path)
-            self.page_count = doc.page_count
-            file_size = os.path.getsize(pdf_path) / (1024 * 1024)
-            doc.close()
-            
-            # Validar que sea de 1 página
-            # if self.page_count == 1:
-            #     self.info_label.configure(
-            #         text=f"✓ {self.page_count} página • {file_size:.2f} MB",
-            #         text_color="#10b981"
-            #     )
-            # else:
-            #     self.info_label.configure(
-            #         text=f"❌ El PDF tiene {self.page_count} páginas.  Solo se permite 1 página.",
-            #         text_color="red"
-            #     )
-            
-            self._update_counter()
-            
-        except Exception as e:
-            self.info_label.configure(
-                text=f"❌ Error:  {e}",
-                text_color="red"
-            )
-            self. page_count = 0
+        self.pdf_path = path
+        self.pdf_entry.delete(0, "end")
+        self.pdf_entry.insert(0, path)
+        
+        # Actualizar nombre de archivo en el header
+        file_name = os.path.basename(path)
+        self.file_name_lbl.configure(text=f"📄 {file_name}", text_color="white")
+        
+        if not self.output_entry.get().strip():
+            self.output_entry.delete(0, "end")
+            self.output_entry.insert(0, os.path.dirname(path))
+        
+        self._log("INFO", f"PDF seleccionado: {file_name}")
     
     def _on_select_output(self):
-        """Selecciona la carpeta de salida."""
+        """Selecciona carpeta de salida."""
         folder = filedialog.askdirectory(title="Seleccionar carpeta de salida")
         if folder:
-            self.output_entry. delete(0, tk.END)
-            self.output_entry. insert(0, folder)
+            self.output_entry.delete(0, "end")
+            self.output_entry.insert(0, folder)
+            self._log("INFO", f"Carpeta de salida: {folder}")
     
     def _on_clear(self):
         """Limpia el campo de nombres."""
         self.names_textbox.clear()
         self._update_counter()
-        messagebox.showinfo("Limpiar", "Se ha limpiado el listado de nombres.")
+        self._log("INFO", "Lista de nombres limpiada.")
     
     def _update_counter(self, event=None):
-        """Actualiza el contador de nombres (máximo 10)."""
+        """Actualiza el contador de nombres."""
         names = self._get_names_list()
-        names_count = len(names)
+        count = len(names)
         
-        # Actualizar color según cantidad
-        if names_count == 0:
-            color = "gray"
-            icon = ""
-        elif names_count <= MAX_NOMBRES:
-            color = "green"
-            icon = "✓ "
+        if count == 0:
+            color, icon = "gray", ""
+        elif count <= MAX_NOMBRES:
+            color, icon = "green", "✓ "
         else:
-            color = "red"
-            icon = "❌ "
+            color, icon = "red", "❌ "
         
-        self.counter_label.configure(
-            text=f"{icon}{names_count} / {MAX_NOMBRES} nombres",
-            text_color=color
-        )
-    
-    # ==================== OPERACIONES ====================
+        self.counter_lbl.configure(text=f"{icon}{count} / {MAX_NOMBRES} nombres", text_color=color)
     
     def _get_names_list(self) -> List[str]:
-        """Obtiene la lista de nombres del textbox."""
-        text = self.names_textbox. get_content()
-        
+        """Obtiene la lista de nombres."""
+        text = self.names_textbox.get_content()
         if not text:
             return []
-        
-        lines = text.split('\n')
-        return [line.strip() for line in lines if line.strip()]
+        return [line.strip() for line in text.split('\n') if line.strip()]
     
     def _on_process(self):
-        """Procesa el PDF multiplicándolo por cada nombre."""
-        # Obtener datos
+        """Procesa el PDF multiplicándolo."""
         pdf_path = self.pdf_entry.get().strip()
         output_dir = self.output_entry.get().strip()
         prefix = self.prefix_entry.get().strip()
         names = self._get_names_list()
         
         # Validaciones
-        if not pdf_path: 
-            messagebox.showerror("Error", "Selecciona un archivo PDF.")
+        if not pdf_path:
+            messagebox.showerror("Error", "No se ha seleccionado un PDF.")
+            self._log("ERROR", "No se ha seleccionado un PDF.")
             return
         
         if not os.path.exists(pdf_path):
-            messagebox.showerror("Error", f"El archivo no existe:\n{pdf_path}")
+            messagebox.showerror("Error", "El archivo PDF no existe.")
+            self._log("ERROR", f"El archivo no existe: {pdf_path}")
             return
         
         if not names:
-            messagebox.showerror("Error", "Ingresa al menos un nombre.")
+            messagebox.showerror("Error", "Debes ingresar al menos un nombre.")
+            self._log("ERROR", "Debes ingresar al menos un nombre.")
             return
         
-        # Validar máximo de nombres
         if len(names) > MAX_NOMBRES:
-            messagebox.showerror(
-                "Error",
-                f"Máximo {MAX_NOMBRES} nombres permitidos.\nActualmente tienes {len(names)} nombres."
-            )
+            messagebox.showerror("Error", f"Máximo {MAX_NOMBRES} nombres permitidos. Tienes {len(names)}.")
+            self._log("ERROR", f"Máximo {MAX_NOMBRES} nombres permitidos. Tienes {len(names)}.")
             return
         
         if not output_dir:
             output_dir = os.path.dirname(pdf_path)
         
-        # Verificar que el PDF tenga 1 página
-        try:
-            doc = fitz. open(pdf_path)
-            num_pages = doc.page_count
-            doc.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el PDF:\n{e}")
-            return
-        
-        if num_pages != 1:
-            messagebox.showerror(
-                "Error",
-                f"El PDF debe tener exactamente 1 página.\nEste PDF tiene {num_pages} páginas."
-            )
-            return
-        
-        # Crear carpeta si no existe
-        if not os. path.exists(output_dir):
+        if not os.path.exists(output_dir):
             try:
                 os.makedirs(output_dir)
+                self._log("INFO", f"Carpeta creada: {output_dir}")
             except Exception as e:
-                messagebox. showerror("Error", f"No se pudo crear la carpeta:\n{e}")
+                messagebox.showerror("Error", f"No se pudo crear la carpeta de salida: {e}")
+                self._log("ERROR", f"No se pudo crear la carpeta: {e}")
                 return
         
-        # Confirmar
-        response = messagebox.askyesno(
-            "Confirmar",
-            f"¿Crear {len(names)} copias del PDF?\n\n"
-            f"Prefijo: {prefix}\n"
-            f"Carpeta:  {output_dir}\n\n"
-            f"Nombres:\n" + "\n".join(f"  • {n}" for n in names[: 5]) +
-            (f"\n  ...  y {len(names) - 5} más" if len(names) > 5 else "")
-        )
+        # Procesar
+        self._log("INFO", f"Iniciando multiplicación: {len(names)} copias con prefijo '{prefix}'")
         
-        if not response: 
-            return
-        
-        # Procesar - Multiplicar el PDF
         try:
-            doc = fitz.open(pdf_path)
-            created_files:  List[str] = []
+            created_files = []
             
-            for name in names:
-                # Crear nuevo documento con la única página
-                new_doc = fitz.open()
-                new_doc.insert_pdf(doc, from_page=0, to_page=0)
-                
-                # Generar nombre del archivo (SIN ESPACIO en la extensión)
+            for idx, name in enumerate(names, 1):
                 clean_name = clean_filename(name)
                 file_name = f"{prefix}{clean_name}.pdf"
                 file_path = os.path.join(output_dir, file_name)
-                file_path = create_unique_path(file_path)
                 
-                # Guardar
-                new_doc.save(file_path, garbage=4, deflate=True)
-                new_doc.close()
+                # Evitar sobrescribir
+                counter = 1
+                while os.path.exists(file_path):
+                    file_name = f"{prefix}{clean_name} ({counter}).pdf"
+                    file_path = os.path.join(output_dir, file_name)
+                    counter += 1
                 
+                # Copiar archivo
+                shutil.copy(pdf_path, file_path)
                 created_files.append(file_path)
-                print(f"[INFO] Creado: {file_path}")
+                self._log("OK", f"[{idx}/{len(names)}] Creado: {file_name}")
             
-            doc.close()
-            
-            # Guardar estado para deshacer (NO eliminamos el original)
+            # Guardar estado para deshacer
             self.last_operation = {
                 'original_path': pdf_path,
-                'original_removed': False,
+                'output_dir': output_dir,
                 'created_files': created_files.copy()
             }
-            self.undo_button.configure(state="normal")
             
-            # Mensaje de éxito
-            messagebox.showinfo(
-                "Éxito",
-                f"✅ Se han creado {len(created_files)} copias del PDF.\n\n"
-                f"El archivo original se mantiene intacto."
-            )
+            # Eliminar el PDF original
+            os.remove(pdf_path)
+            self._log("WARNING", f"PDF original eliminado: {os.path.basename(pdf_path)}")
+            
+            self.undo_btn.configure(state="normal")
+            self._log("OK", f"✅ Proceso completado: {len(created_files)} archivos creados.")
             
         except Exception as e:
-            messagebox.showerror("Error", f"Hubo un error:\n{e}")
-            print(f"[ERROR] {e}")
+            messagebox.showerror("Error", f"Error durante el proceso: {e}")
+            self._log("ERROR", f"Error durante el proceso: {e}")
     
     def _on_undo(self):
-        """Deshace la última operación eliminando los archivos creados."""
+        """Deshace la última operación."""
         if not self.last_operation:
-            messagebox.showinfo("Info", "No hay operación para deshacer.")
+            self._log("WARNING", "No hay operación para deshacer.")
             return
         
-        created_files = self.last_operation. get('created_files', [])
+        created_files = self.last_operation.get('created_files', [])
+        original_path = self.last_operation.get('original_path')
+        output_dir = self.last_operation.get('output_dir')
         
-        if not created_files: 
-            messagebox.showinfo("Info", "No hay archivos para eliminar.")
+        if not created_files:
+            self._log("WARNING", "No hay archivos para eliminar.")
             self.last_operation = None
-            self. undo_button.configure(state="disabled")
+            self.undo_btn.configure(state="disabled")
             return
         
-        # Confirmar
-        response = messagebox.askyesno(
-            "Confirmar Deshacer",
-            f"¿Eliminar {len(created_files)} archivos creados?"
-        )
-        
-        if not response:
-            return
+        self._log("INFO", "Iniciando operación de deshacer...")
         
         try:
-            # Eliminar archivos creados
-            deleted_count = 0
-            for file_path in created_files: 
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                        deleted_count += 1
-                        print(f"[INFO] Eliminado: {file_path}")
-                    except Exception as e: 
-                        print(f"[WARN] No se pudo eliminar {file_path}: {e}")
-            
-            messagebox.showinfo(
-                "Deshacer completado",
-                f"Se eliminaron {deleted_count} archivos."
-            )
+            # Restaurar el PDF original
+            if created_files and os.path.exists(created_files[0]):
+                first_copy = created_files[0]
+                
+                if os.path.dirname(original_path) != output_dir:
+                    shutil.copy2(first_copy, original_path)
+                else:
+                    os.rename(first_copy, original_path)
+                
+                self._log("OK", f"PDF original restaurado: {os.path.basename(original_path)}")
+                
+                # Eliminar todas las copias
+                deleted = 0
+                for file_path in created_files:
+                    if os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                            deleted += 1
+                        except:
+                            pass
+                
+                self._log("OK", f"Eliminadas {deleted} copias.")
+                self._log("OK", "✅ Operación de deshacer completada.")
             
             self.last_operation = None
-            self.undo_button.configure(state="disabled")
+            self.undo_btn.configure(state="disabled")
+            
+            # Actualizar el campo del PDF
+            self.pdf_entry.delete(0, "end")
+            self.pdf_entry.insert(0, original_path)
+            self.file_name_lbl.configure(text=f"📄 {os.path.basename(original_path)}", text_color="white")
             
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo deshacer:\n{e}")
-            print(f"[ERROR] Deshacer:  {e}")
+            self._log("ERROR", f"Error al deshacer: {e}")
 
+
+if __name__ == "__main__":
+    root = ctk.CTk()
+    root.title("PDF Multiplier")
+    root.geometry("800x700")
+    root.minsize(700, 600)
+    app = PDFMultiplierSupportApp(root)
+    app.pack(fill="both", expand=True)
+    root.mainloop()
