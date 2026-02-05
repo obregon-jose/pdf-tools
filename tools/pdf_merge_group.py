@@ -170,12 +170,13 @@ def undo_merge(folder: str, key: str, output_file: Path) -> Tuple[bool, List[str
 class AccordionItem(ctk.CTkFrame):
     """Item de acordeón para un grupo de PDFs."""
     
-    def __init__(self, master, group_key: str, files: List[str], on_merge_callback):
-        super().__init__(master, fg_color="#f3f3f3", corner_radius=8, border_width=2, border_color="#7b7b7b")
+    def __init__(self, master, group_key: str, files: List[str], on_merge_callback, on_toggle_callback):
+        super().__init__(master, fg_color="#3a3a3a", corner_radius=8, border_width=2, border_color="#1f1f1f")
         
         self.group_key = group_key
         self.files = files
         self.on_merge_callback = on_merge_callback
+        self.on_toggle_callback = on_toggle_callback
         self.is_expanded = False
         
         self._create_widgets()
@@ -211,7 +212,7 @@ class AccordionItem(ctk.CTkFrame):
         # Badge
         ctk.CTkLabel(
             header,
-            text="✔️",
+            text="✓",
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color="#10b981",
             width=28
@@ -231,7 +232,7 @@ class AccordionItem(ctk.CTkFrame):
         ).pack(side="right", padx=2)
         
         # Panel expandible
-        self.content = ctk.CTkFrame(self, fg_color="transparent", corner_radius=4)
+        self.content = ctk.CTkFrame(self, fg_color="#2e2e2e", corner_radius=6)
         
         for filename in self.files:
             ctk.CTkLabel(
@@ -239,17 +240,31 @@ class AccordionItem(ctk.CTkFrame):
                 text=f"📄 {filename}",
                 font=ctk.CTkFont(size=11),
                 anchor="w",
-                text_color="#5f5f5f"
-            ).pack(anchor="w", padx=12, pady=1)
+                text_color="#b0b0b0"
+            ).pack(anchor="w", padx=12, pady=3)
     
     def _toggle(self):
+        """Toggle del acordeón con notificación al padre."""
+        if self.is_expanded:
+            self.collapse()
+        else:
+            # Notificar al padre que este acordeón se va a expandir
+            self.on_toggle_callback(self)
+            self.expand()
+    
+    def expand(self):
+        """Expande el acordeón."""
+        if not self.is_expanded:
+            self.content.pack(fill="x", padx=8, pady=(0,8))
+            self.toggle_btn.configure(text="▼")
+            self.is_expanded = True
+    
+    def collapse(self):
+        """Colapsa el acordeón."""
         if self.is_expanded:
             self.content.pack_forget()
             self.toggle_btn.configure(text="▶")
-        else:
-            self.content.pack(fill="x", padx=8, pady=(0,8))
-            self.toggle_btn.configure(text="▼")
-        self.is_expanded = not self.is_expanded
+            self.is_expanded = False
     
     def _on_merge_click(self):
         self.on_merge_callback(self.group_key, self.files)
@@ -267,6 +282,7 @@ class PDFMergerGroupApp(ctk.CTkFrame):
         self.groups: Dict[str, List[str]] = {}
         self.accordion_items: List[AccordionItem] = []
         self.last_operation: Optional[Dict] = None
+        self.currently_expanded: Optional[AccordionItem] = None
         
         self._create_widgets()
     
@@ -371,6 +387,7 @@ class PDFMergerGroupApp(ctk.CTkFrame):
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
         self.accordion_items.clear()
+        self.currently_expanded = None
         
         ctk.CTkLabel(
             self.scroll_frame,
@@ -378,6 +395,15 @@ class PDFMergerGroupApp(ctk.CTkFrame):
             font=ctk.CTkFont(size=14),
             text_color="gray"
         ).pack(pady=40)
+    
+    def _on_accordion_toggle(self, accordion_item: AccordionItem):
+        """Callback cuando un acordeón se va a expandir."""
+        # Cerrar el acordeón actualmente expandido si existe y es diferente
+        if self.currently_expanded and self.currently_expanded is not accordion_item:
+            self.currently_expanded.collapse()
+        
+        # Actualizar referencia
+        self.currently_expanded = accordion_item
     
     def _on_select_folder(self):
         """Selecciona carpeta."""
@@ -400,7 +426,7 @@ class PDFMergerGroupApp(ctk.CTkFrame):
             return
         
         self.folder_path = folder
-        self._log("INFO", f"Carpeta seleccionada: {folder}")
+        self._log("INFO", f"Carpeta: {os.path.basename(folder)}")
         self._refresh()
     
     def _refresh(self):
@@ -426,26 +452,33 @@ class PDFMergerGroupApp(ctk.CTkFrame):
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
         self.accordion_items.clear()
+        self.currently_expanded = None
         
         if not self.groups:
             self._show_empty_message("⚠️ No hay grupos con más de 1 PDF")
             return
         
         for key, files in self.groups.items():
-            item = AccordionItem(self.scroll_frame, key, files, self._on_merge_group)
+            item = AccordionItem(
+                self.scroll_frame,
+                key,
+                files,
+                self._on_merge_group,
+                self._on_accordion_toggle  # ← Pasar callback
+            )
             item.pack(fill="x", padx=4, pady=4)
             self.accordion_items.append(item)
     
     def _on_merge_group(self, key: str, files: List[str]):
         """Une un grupo individual."""
-        self._log("INFO", f"Iniciando unión del grupo '{key}' ({len(files)} archivos)...")
+        self._log("INFO", f"Uniendo grupo '{key}' ({len(files)} archivos)...")
         
         success, errors, output_path = merge_group_and_move(self.folder_path, key, files)
         
         if success:
             self.last_operation = {'type': 'single', 'key': key, 'files': files.copy(), 'output': output_path}
             self.undo_btn.configure(state="normal")
-            self._log("SUCCESS", f"✅ Grupo '{key}' unido → {output_path.name}")
+            self._log("SUCCESS", f"✅ '{key}' → {output_path.name}")
         else:
             for error in errors[:3]:
                 self._log("ERROR", error)
@@ -468,17 +501,17 @@ class PDFMergerGroupApp(ctk.CTkFrame):
             if success:
                 merged_count += 1
                 merged_outputs.append({'key': key, 'files': files.copy(), 'output': output_path})
-                self._log("SUCCESS", f"✅ Grupo '{key}' unido → {output_path.name}")
+                self._log("SUCCESS", f"✅ '{key}' → {output_path.name}")
             else:
                 for error in errors[:2]:
-                    self._log("ERROR", f"Grupo '{key}': {error}")
+                    self._log("ERROR", f"'{key}': {error}")
         
         if merged_outputs:
             self.last_operation = {'type': 'all', 'merged': merged_outputs}
             self.undo_btn.configure(state="normal")
         
         self._refresh()
-        self._log("SUCCESS", f"✅ Proceso completado: {merged_count}/{len(self.groups)} grupos unidos.")
+        self._log("SUCCESS", f"✅ Completado: {merged_count}/{len(self.groups)} grupos.")
     
     def _on_undo(self):
         """Deshace la última operación."""
@@ -492,18 +525,18 @@ class PDFMergerGroupApp(ctk.CTkFrame):
             key = self.last_operation['key']
             output = self.last_operation['output']
             
-            self._log("INFO", f"Deshaciendo unión del grupo '{key}'...")
+            self._log("INFO", f"Deshaciendo '{key}'...")
             success, errors = undo_merge(self.folder_path, key, output)
             
             if success:
-                self._log("SUCCESS", f"✅ Grupo '{key}' restaurado.")
+                self._log("SUCCESS", f"✅ '{key}' restaurado.")
             else:
                 for error in errors:
                     self._log("ERROR", error)
         
         elif op_type == 'all':
             merged = self.last_operation.get('merged', [])
-            self._log("INFO", f"Deshaciendo unión de {len(merged)} grupos...")
+            self._log("INFO", f"Deshaciendo {len(merged)} grupos...")
             
             restored = 0
             for item in merged:
