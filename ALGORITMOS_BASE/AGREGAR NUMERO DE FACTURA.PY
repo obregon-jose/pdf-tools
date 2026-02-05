@@ -1,22 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# rename_pdf_tk.py
-#
-# Pequeña aplicación Tkinter para buscar y reemplazar patrones en los nombres
-# de archivos PDF dentro de una carpeta (opción recursiva disponible).
-#
-# Características:
-# - Seleccionar carpeta
-# - Especificar patrón a buscar y texto de reemplazo
-# - Modo: literal o expresión regular
-# - Opciones: sensible a mayúsculas, recursivo, sobrescribir archivos destino
-# - Previsualizar los cambios antes de renombrar
-# - Renombrar todos o solo los seleccionados desde la lista
-#
-# Uso:
-# python3 rename_pdf_tk.py
-#
-# Requiere Python 3.x (sin dependencias externas).
+
 
 import os
 import re

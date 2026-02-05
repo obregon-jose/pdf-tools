@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# rename_pdf_tk.py corregido: usando ttk.Treeview en lugar de CTkTreeview
 
 import os
 import re
