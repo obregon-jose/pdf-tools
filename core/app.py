@@ -1,10 +1,9 @@
 import customtkinter as ctk
-# import os, sys
-# from pathlib import Path
-
 from core.config import load_config, save_config
-from ui.main_window import MainWindow
 from core.config import APP_NAME, VERSION, DEFAULT_CONFIG
+from ui.main_window import MainWindow
+from ui.toast_notification import ToastManager
+
 
 class App(ctk.CTk):
     def __init__(self):
@@ -15,6 +14,8 @@ class App(ctk.CTk):
         # self.iconbitmap("assets/icon.ico")
         self.geometry("850x540")
         self.minsize(850, 540)
+
+        ToastManager.initialize(self)
 
         ctk.set_appearance_mode(self.config_data.get("theme", DEFAULT_CONFIG["theme"]))
         ctk.set_default_color_theme(DEFAULT_CONFIG["color_theme"])
