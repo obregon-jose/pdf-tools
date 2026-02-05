@@ -523,3 +523,12 @@ class PDFMultiplierSupportApp(ctk.CTkFrame):
             messagebox.showerror("Error", f"No se pudo deshacer:\n{e}")
             print(f"[ERROR] Deshacer:  {e}")
 
+
+if __name__ == "__main__":
+    root = ctk.CTk()
+    root.title("Verificador CRC/OPF")
+    root.geometry("1000x700")
+    root.minsize(900, 600)
+    app = PDFMultiplierSupportApp(root)
+    app.pack(fill="both", expand=True)
+    root.mainloop()
