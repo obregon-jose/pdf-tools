@@ -9,6 +9,7 @@ from tools.pdf_merge_group import PDFMergerGroupApp
 from tools.pdf_multiplier_support import PDFMultiplierSupportApp
 from tools.pdf_split_orders import PDFSplitOrdersApp
 from tools.carnet_virtual import CarnetVirtualApp
+from tools.pdf_verifier_supports import PDFVerifierSupportsApp
 
 TOOLS_REGISTRY = [
 
@@ -84,12 +85,12 @@ TOOLS_REGISTRY = [
         "category": "VAXTHERA",
         "class": CarnetVirtualApp,
     },
-    # {
-    #     "name": "Reporte POLIZA",
-    #     "description": "Genera el archivo de reporte de aplicaciones",
-    #     "category": "VAXTHERA",
-    #     "class": BaseTool,
-    # },
+    {
+        "name": "Revisar Soportes Radicación",
+        "description": "Revisa que los archivos de soporte de radicación coincidan con los documentos del detalle de cargue",
+        "category": "Revisión",
+        "class": PDFVerifierSupportsApp,
+    },
     # {
     #     "name": "",
     #     "description": "",
