@@ -1,4 +1,3 @@
-from tools.base import BaseTool
 from tools.pdf_splitter import PDFSplitterApp
 from ALGORITMOS_BASE.pdf_splitter2 import PDFSplitterApp2
 from tools.pdf_page_deleter import PDFPageDeleterApp
@@ -10,24 +9,25 @@ from tools.pdf_multiplier_support import PDFMultiplierSupportApp
 from tools.pdf_split_orders import PDFSplitOrdersApp
 from tools.carnet_virtual import CarnetVirtualApp
 from tools.pdf_verifier_supports import PDFVerifierSupportsApp
+from tools.pdf_factura_updater import InvoiceNumberUpdaterApp
 
 TOOLS_REGISTRY = [
 
     {
         "name": "Unir PDFs",
-        "description": "Une múltiples archivos PDF seleccionados en uno solo.",
+        "description": "Une múltiples PDFs en uno solo archivo segun seleccion.",
         "category": "PDF",
         "class": PDFMergerApp,
     },
     {
         "name": "Unir grupos de PDFs",
-        "description": "Une grupos de archivos PDF de acuerdo al nombres similares.",
-        "category": "PDF",
+        "description": "Une grupos de archivos PDF de acuerdo a nombres similares.",
+        "category": "RADICACIÓN",
         "class": PDFMergerGroupApp,
     },
     {
         "name": "Dividir PDF",
-        "description": "Divide un archivo PDF en múltiples archivos según el número de páginas.",
+        "description": "Divide un archivo PDF en paginas separadas.",
         "category": "PDF",
         "class": PDFSplitterApp,
     },
@@ -39,25 +39,25 @@ TOOLS_REGISTRY = [
     },
     {
         "name": "Multiplicar Soportes CRC",
-        "description": "Multiplica un archivo PDF con diferentes nombres de soporte.",
+        "description": "Multiplica un archivo PDF con diferentes nombres.",
         "category": "RADICACIÓN",
         "class": PDFMultiplierSupportApp,
     },
     {
         "name": "Separar Ordenes OPF",
-        "description": "Divide un archivo PDF de órdenes OPF en múltiples archivos individuales por paciente.",
+        "description": "Divide un archivo PDF de órdenes OPF en archivos individuales.",
         "category": "RADICACIÓN",
         "class": PDFSplitOrdersApp,
     },
     {
         "name": "Validar correos",
-        "description": "Valida si una lista de correos electrónicos son válidos o no.",
+        "description": "Valida si una lista de correos electrónicos tienen un formato válido.",
         "category": "Revisión",
         "class": ValidateEmailApp,
     },
     {
         "name": "HORUS",
-        "description": "Consulta de afiliados en HORUS a partir del detalle de carga.",
+        "description": "Consulta pacientes en HORUS a partir del detalle de carga.",
         "category": "Revisión",
         "class": HorusApp,
     },
@@ -67,12 +67,18 @@ TOOLS_REGISTRY = [
     #     "category": "Revisión",
     #     "class": BaseTool,
     # },
-    # {
-    #     "name": "Actualizar # Factura",
-    #     "description": "Permite insertar o actualizar el número de factura en un conjunto de archivos PDF.",
-    #     "category": "PDF",
-    #     "class": BaseTool,
-    # },
+    {
+        "name": "Actualizar # Factura",
+        "description": "Actualiza masivamente el numero de factura en los archivos de soporte OPF y CRC.",
+        "category": "RADICACIÓN",
+        "class": InvoiceNumberUpdaterApp,
+    },
+    {
+        "name": "Comparar Soportes",
+        "description": "Revisa que los archivos de soporte CRC y OPF coincidan con los documentos del detalle de cargue",
+        "category": "RADICACIÓN",
+        "class": PDFVerifierSupportsApp,
+    },
     {
         "name": "Extraer paginas de PDF",
         "description": "",
@@ -85,12 +91,7 @@ TOOLS_REGISTRY = [
         "category": "VAXTHERA",
         "class": CarnetVirtualApp,
     },
-    {
-        "name": "Revisar Soportes Radicación",
-        "description": "Revisa que los archivos de soporte de radicación coincidan con los documentos del detalle de cargue",
-        "category": "Revisión",
-        "class": PDFVerifierSupportsApp,
-    },
+    
     # {
     #     "name": "",
     #     "description": "",
