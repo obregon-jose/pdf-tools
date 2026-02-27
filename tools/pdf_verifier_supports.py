@@ -6,6 +6,13 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from openpyxl import load_workbook
 from typing import List, Dict, Tuple, Set
+from ui.toast_notification import (
+    ToastManager,
+    toast_info,
+    toast_success,
+    toast_warning,
+    toast_error
+)
 
 
 # ==================== UTILIDADES ====================
@@ -512,7 +519,7 @@ class PDFVerifierSupportsApp(ctk.CTkFrame):
         style.configure("Dark.Treeview", background="#2b2b2b", foreground="white", fieldbackground="#2b2b2b", borderwidth=0, rowheight=26)
         style.configure("Dark.Treeview.Heading", background="#3b3b3b", foreground="white", borderwidth=1)
         style.map("Dark.Treeview", background=[("selected", "#1f6feb")], foreground=[("selected", "white")])
-    
+    #_log1
     def _log(self, level: str, message: str):
         colors = {"INFO": "#7f8c8d", "SUCCESS": "#27ae60", "WARNING": "#f39c12", "ERROR": "#e74c3c"}
         
@@ -546,20 +553,20 @@ class PDFVerifierSupportsApp(ctk.CTkFrame):
         if not path:
             return
         
-        self._log("INFO", f"Importando: {os.path.basename(path)}")
+        toast_info(f"Importando: {os.path.basename(path)}", 3)
         self.update()
         
         docs, error = import_detalle_cargue(path)
         
         if error:
-            self._log("ERROR", error)
-            self._log("WARNING", "Por favor importe un archivo de Detalle de Cargue válido.")
+
+            self.after(200, lambda: toast_error(error))
+            self.after(700, lambda: toast_warning("Por favor importe un archivo de Detalle de Cargue válido.", 5))
             return
         
         self.input_text.delete("1.0", "end")
         self.input_text.insert("1.0", "\n".join(docs))
-        
-        self._log("SUCCESS", f"Importados {len(docs)} documentos únicos.")
+        self.after(200, lambda: toast_success(f"Importado correctamente.\n{len(docs)} documentos cargados."))
         self._disable_zip()
     
     def _disable_zip(self):
@@ -574,7 +581,7 @@ class PDFVerifierSupportsApp(ctk.CTkFrame):
     
     def _verify(self):
         if not self.folder_path:
-            self._log("WARNING", "Selecciona una carpeta.")
+            toast_warning("Selecciona una carpeta.", 3)
             return
         
         for item in self.table.get_children():
@@ -584,8 +591,8 @@ class PDFVerifierSupportsApp(ctk.CTkFrame):
         
         input_text = self.input_text.get("1.0", "end").strip()
         input_docs = [line.strip() for line in input_text.splitlines() if line.strip()]
-        
-        self._log("INFO", "Clasificando archivos...")
+    
+        toast_info("Clasificando archivos...", 3)
         files = classify_files(self.folder_path)
         
         self.last_files = files
@@ -595,14 +602,14 @@ class PDFVerifierSupportsApp(ctk.CTkFrame):
         has_opf = len(files['OPF']) > 0
         sources = sum([has_input, has_crc, has_opf])
         
-        self._log("INFO", f"INPUT: {len(input_docs)}, CRC: {len(files['CRC'])}, OPF: {len(files['OPF'])}")
+        toast_info(f"DATOS\nDOC: {len(input_docs)}\nCRC: {len(files['CRC'])}\nOPF: {len(files['OPF'])}", 10)
         
         if sources < 2:
-            self._log("ERROR", "❌ Se requieren mínimo 2 fuentes.")
+            toast_error("❌ Ingrese una carpeta con los archivos o inserte documentos en el panel.", 5)
             self.count_lbl.configure(text="0 registros")
             return
         
-        self._log("INFO", "Verificando...")
+        toast_info("Verificando...", 3)
         results, can_zip = verify_documents(input_docs, files['CRC'], files['OPF'])
         
         for r in results:
@@ -614,13 +621,13 @@ class PDFVerifierSupportsApp(ctk.CTkFrame):
             ))
         
         if len(results) == 0:
-            self._log("SUCCESS", "✅ ¡Todo completo!")
+            toast_success("✅ Todos los documentos son compatibles.", 5)
             if can_zip:
                 self._enable_zip()
             else:
-                self._log("WARNING", "⚠️ No se puede crear ZIP: Solo hay OPF (requiere CRC).")
+                toast_warning("⚠️ No se puede crear ZIP: Solo hay OPF (requiere CRC).", 5)
         else:
-            self._log("WARNING", f"⚠️ {len(results)} incompletos.")
+            toast_warning(f"⚠️ {len(results)} incompatibles.", 0)
         
         self.count_lbl.configure(text=f"{len(results)} incompletos")
     
@@ -631,19 +638,19 @@ class PDFVerifierSupportsApp(ctk.CTkFrame):
             return
         
         if not self.folder_path:
-            self._log("WARNING", "No hay carpeta seleccionada.")
+            toast_warning("Debes seleccionar una carpeta.", 3)
             return
         
         crc_files = self.last_files.get('CRC', [])
         opf_files = self.last_files.get('OPF', [])
         
-        self._log("INFO", "Creando ZIP...")
+        toast_info("Creando ZIP...", 3)
         self.update()
         
         success, message, count = create_zip_file(self.folder_path, crc_files, opf_files)
         
         if success:
-            self._log("SUCCESS", f"✅ ZIP creado: {message}")
+            toast_success(f"✅ ZIP creado: {message}", 5)
             self._log("SUCCESS", f"📦 {count} archivos ({len(crc_files)} CRC + {len(opf_files)} OPF)")
         else:
             self._log("ERROR", message)
@@ -654,7 +661,7 @@ class PDFVerifierSupportsApp(ctk.CTkFrame):
             self.table.delete(item)
         self.count_lbl.configure(text="0 registros")
         self._disable_zip()
-        self._log("INFO", "Limpiado.")
+        toast_info("Limpiado.", 3)
 
 
 if __name__ == "__main__":

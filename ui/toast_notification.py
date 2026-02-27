@@ -47,7 +47,7 @@ class Toast(ctk.CTkFrame):
         parent,
         message: str,
         toast_type: Literal["info", "success", "warning", "error"] = "info",
-        duration: int = 3000,
+        seconds_duration: int = 3000,
         y_position: int = 20
     ):
         colors = self.COLORS.get(toast_type, self.COLORS["info"])
@@ -70,7 +70,7 @@ class Toast(ctk.CTkFrame):
         
         self.message = message
         self.toast_type = toast_type
-        self.duration = duration
+        self.seconds_duration = seconds_duration
         self.colors = colors
         self.is_closing = False
         self.y_position = y_position
@@ -81,8 +81,8 @@ class Toast(ctk.CTkFrame):
         self.place(relx=1.0, y=y_position, anchor="ne", x=-20)
         self.lift()
         
-        if duration > 0:
-            self._after_id = self.after(duration, self.close)
+        if seconds_duration > 0:
+            self._after_id = self.after(seconds_duration, self.close)
     
     def _build_ui(self):
         """Construye la interfaz del toast."""
@@ -204,7 +204,7 @@ class ToastManager:
         cls,
         message: str,
         toast_type: Literal["info", "success", "warning", "error"] = "info",
-        duration: int = 3000
+        seconds_duration: int = 3
     ) -> Optional[Toast]:
 
         if cls._root is None:
@@ -213,7 +213,7 @@ class ToastManager:
         
         try:
             y_position = cls._calculate_next_position()
-            toast = Toast(cls._root, message, toast_type, duration, y_position)
+            toast = Toast(cls._root, message, toast_type, seconds_duration*1000, y_position)
             toast.set_close_callback(cls._on_toast_closed)
             cls._toasts.append(toast)
             cls._root.after(50, cls._reposition_toasts)
@@ -253,19 +253,19 @@ class ToastManager:
 def toast(
     message: str,
     toast_type: Literal["info", "success", "warning", "error"] = "info",
-    duration: int = 3000
+    seconds_duration: int = 5
 ) -> Optional[Toast]:
-    return ToastManager.show(message, toast_type, duration)
+    return ToastManager.show(message, toast_type, seconds_duration)
 
 # Funciones específicas (opcionales, para quien prefiera)
-def toast_info(message: str, duration: int = 3000) -> Optional[Toast]:
-    return ToastManager.show(message, "info", duration)
+def toast_info(message: str, seconds_duration: int = 3) -> Optional[Toast]:
+    return ToastManager.show(message, "info", seconds_duration)
 
-def toast_success(message: str, duration: int = 3000) -> Optional[Toast]:
-    return ToastManager.show(message, "success", duration)
+def toast_success(message: str, seconds_duration: int = 3) -> Optional[Toast]:
+    return ToastManager.show(message, "success", seconds_duration)
 
-def toast_warning(message: str, duration: int = 3000) -> Optional[Toast]:
-    return ToastManager.show(message, "warning", duration)
+def toast_warning(message: str, seconds_duration: int = 4) -> Optional[Toast]:
+    return ToastManager.show(message, "warning", seconds_duration)
 
-def toast_error(message: str, duration: int = 4000) -> Optional[Toast]:
-    return ToastManager.show(message, "error", duration)
+def toast_error(message: str, seconds_duration: int = 5) -> Optional[Toast]:
+    return ToastManager.show(message, "error", seconds_duration)

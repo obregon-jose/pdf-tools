@@ -1,0 +1,18 @@
+# RADICOR - Dependencias
+
+# Procesamiento PDF
+PyMuPDF==1.23.0
+
+# Interfaz Gráfica
+customtkinter==5.2.0
+Pillow==10.0.0
+
+# HTTP y APIs
+requests==2.31.0
+
+# Validación
+email-validator==2.0.0
+validators==0.20.0
+
+# Opcional: compilar a ejecutable
+# pyinstaller==5.13.0

@@ -1,8 +1,9 @@
 import os
 import json
 
-APP_NAME = "PDF Tools"
+APP_NAME = "RADICOR"
 VERSION = "1.0.0"
+DESCRIPTION = "Sistema Integral de Procesamiento y Radicación de Documentos"
 
 
 # AUTOR = "José Obregón"
