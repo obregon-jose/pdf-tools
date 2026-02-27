@@ -18,7 +18,7 @@ class PAIWebCarnetsManager(ctk.CTkFrame):
     
     def __init__(self, master=None):
         super().__init__(master)
-        self.area_font_default = 13
+        self.area_font_default = 11
         self.pack(fill="both", expand=True)
         self._build_ui()
         self.patient_panels = []
@@ -33,8 +33,10 @@ class PAIWebCarnetsManager(ctk.CTkFrame):
 
         self.main_container = ctk.CTkFrame(self)
         self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Panel izquierdo 5%, panel derecho 95%
         self.main_container.grid_columnconfigure(0, weight=1)
-        self.main_container.grid_columnconfigure(1, weight=9)
+        self.main_container.grid_columnconfigure(1, weight=19)
         self.main_container.grid_rowconfigure(1, weight=1)
 
         self._build_top_panel()
@@ -70,46 +72,71 @@ class PAIWebCarnetsManager(ctk.CTkFrame):
         self.formato_selector.set(FILENAME_OPTIONS[0])
 
     def _build_left_panel(self):
-        """Panel izquierdo: Entrada de documentos (10%)"""
+        """Panel izquierdo: Entrada de documentos (5%)"""
         left_container = ctk.CTkFrame(self.main_container)
-        left_container.grid(row=1, column=0, sticky="nsew", padx=(6,3), pady=5)
+        left_container.grid(row=1, column=0, sticky="nsew", padx=(6,2), pady=5)
         left_container.grid_rowconfigure(1, weight=1)
         left_container.grid_columnconfigure(0, weight=1)
 
-        lbl_docs = ctk.CTkLabel(left_container, text="📑 Documentos", font=ctk.CTkFont(size=13, weight="bold"), anchor="w")
-        lbl_docs.grid(row=0, column=0, sticky="ew", padx=8, pady=(5,2))
+        lbl_docs = ctk.CTkLabel(
+            left_container, 
+            text="📑 Documentos", 
+            font=ctk.CTkFont(size=11, weight="bold"), 
+            anchor="center"
+        )
+        lbl_docs.grid(row=0, column=0, sticky="ew", padx=4, pady=(5,2))
 
-        # Área de texto para documentos
-        self.area = ctk.CTkTextbox(left_container, font=("Consolas", self.area_font_default), border_width=2)
-        self.area.grid(row=1, column=0, sticky="nsew", padx=8, pady=5)
+        self.area = ctk.CTkTextbox(
+            left_container, 
+            font=("Consolas", self.area_font_default), 
+            border_width=1
+        )
+        self.area.grid(row=1, column=0, sticky="nsew", padx=4, pady=3)
 
-        # Botones de control
         btns_frame = ctk.CTkFrame(left_container, fg_color="transparent")
-        btns_frame.grid(row=2, column=0, sticky="ew", padx=8, pady=5)
+        btns_frame.grid(row=2, column=0, sticky="ew", padx=4, pady=3)
         btns_frame.grid_columnconfigure(0, weight=1)
-        btns_frame.grid_columnconfigure(1, weight=1)
 
-        btn_paste = ctk.CTkButton(btns_frame, text="📋 Pegar", command=self._paste_clipboard, fg_color="#1f6feb")
-        btn_paste.grid(row=0, column=0, padx=2, pady=2, sticky="ew")
+        btn_paste = ctk.CTkButton(
+            btns_frame, 
+            text="📋 Pegar", 
+            command=self._paste_clipboard, 
+            fg_color="#1f6feb",
+            width=40,
+            height=26,
+            font=ctk.CTkFont(size=14)
+        )
+        btn_paste.grid(row=0, column=0, pady=1, sticky="ew")
 
-        btn_clear = ctk.CTkButton(btns_frame, text="🧹 Limpiar", command=self._clear_all, fg_color="#e74c3c")
-        btn_clear.grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+        btn_clear = ctk.CTkButton(
+            btns_frame, 
+            text="🧹 Limpiar", 
+            command=self._clear_all, 
+            fg_color="#e74c3c",
+            width=40,
+            height=26,
+            font=ctk.CTkFont(size=14)
+        )
+        btn_clear.grid(row=1, column=0, pady=1, sticky="ew")
 
         self.btn_search = ctk.CTkButton(
-            btns_frame, text="🔍 Buscar Vacunas",
+            btns_frame, 
+            text="🔍 Buscar",
             command=self._search_vaccines,
-            fg_color="#14b97d", font=ctk.CTkFont(size=13, weight="bold"), height=40
+            fg_color="#14b97d", 
+            font=ctk.CTkFont(size=18, weight="bold"), 
+            height=45,
+            width=40
         )
-        self.btn_search.grid(row=1, column=0, columnspan=2, padx=2, pady=5, sticky="ew")
+        self.btn_search.grid(row=2, column=0, pady=3, sticky="ew")
 
     def _build_right_panel(self):
-        """Panel derecho: Resultados (90%)"""
+        """Panel derecho: Resultados (95%)"""
         right_container = ctk.CTkFrame(self.main_container)
-        right_container.grid(row=1, column=1, sticky="nsew", padx=(3,6), pady=5)
+        right_container.grid(row=1, column=1, sticky="nsew", padx=(2,6), pady=5)
         right_container.grid_rowconfigure(1, weight=1)
         right_container.grid_columnconfigure(0, weight=1)
 
-        # Header de resultados con filtros
         results_header = ctk.CTkFrame(right_container)
         results_header.grid(row=0, column=0, sticky="ew", padx=6, pady=(5,0))
         results_header.grid_columnconfigure(0, weight=1)
@@ -120,7 +147,6 @@ class PAIWebCarnetsManager(ctk.CTkFrame):
         )
         self.lbl_results.grid(row=0, column=0, sticky="w", padx=8, pady=5)
 
-        # Filtros en segunda fila
         filter_frame = ctk.CTkFrame(results_header, fg_color="transparent")
         filter_frame.grid(row=1, column=0, sticky="ew", padx=8, pady=(0,5))
 
@@ -157,7 +183,6 @@ class PAIWebCarnetsManager(ctk.CTkFrame):
         )
         btn_deselect_all.pack(side="left", padx=2)
 
-        # Contenedor scrollable de resultados
         self.results_container = ctk.CTkScrollableFrame(
             right_container, fg_color="#0a0a0a",
             corner_radius=8, border_width=2, border_color="#2a2a2a"
@@ -171,7 +196,6 @@ class PAIWebCarnetsManager(ctk.CTkFrame):
         bottom_container.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=(5,8))
         bottom_container.grid_columnconfigure(0, weight=1)
 
-        # Botón de descarga
         self.btn_download = ctk.CTkButton(
             bottom_container, text="📥 Descargar Carnets Seleccionados",
             command=self._start_download, fg_color="#14b97d",
@@ -179,7 +203,6 @@ class PAIWebCarnetsManager(ctk.CTkFrame):
         )
         self.btn_download.grid(row=0, column=0, sticky="ew", padx=8, pady=(0,5))
 
-        # Panel de log
         self.logbox = ctk.CTkTextbox(
             bottom_container, font=("Consolas", 10),
             corner_radius=8, border_width=2, height=80
@@ -257,7 +280,6 @@ class PAIWebCarnetsManager(ctk.CTkFrame):
         Thread(target=self._search_vaccines_thread, daemon=True).start()
 
     def _search_vaccines_thread(self):
-        """Busca las vacunas de todos los pacientes"""
         self.btn_search.configure(state="disabled", fg_color="#888")
         self.btn_download.configure(state="disabled", fg_color="#888")
         self.update()

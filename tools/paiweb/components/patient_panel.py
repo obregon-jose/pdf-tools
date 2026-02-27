@@ -4,7 +4,6 @@ import tkinter as tk
 from utils import nombre_completo, format_date
 from vaccine_analyzer import analizar_esquema_vacunacion
 from .vaccines_table import VaccinesTable
-from .esquema_panel import EsquemaVacunacionPanel
 
 
 class PatientVaccinePanel(ctk.CTkFrame):
@@ -125,9 +124,6 @@ class PatientVaccinePanel(ctk.CTkFrame):
     def _populate_details(self):
         if self.is_not_found:
             return
-        
-        # esquema_panel = EsquemaVacunacionPanel(self.details_frame, self.analisis_esquemas)
-        # esquema_panel.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         table = VaccinesTable(self.details_frame, self.vaccines_data)
         table.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
